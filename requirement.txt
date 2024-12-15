@@ -1,0 +1,7 @@
+mediapipe
+opencv-python
+tensorflow
+pillow
+fastapi
+uvicorn
+python-multipart
