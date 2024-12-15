@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main</title>
+    <link rel="stylesheet" href="../styles/main.css"> <!-- Liên kết tới file style.css -->
+</head>
+
+<body>
+    <!-- Thanh dọc bên trái -->
+    <div class="sidebar">
+        <div class="add-group" id="create-group">+</div>
+        <div class="divider"></div>
+        <div class="group-container">
+            <!-- <div class="group">
+                <div class="group-icon">TG</div>
+            </div> -->
+        </div>
+        <!-- Nút Logout -->
+        <div id="logout-button" class="logout-btn">
+            <img src="../assets/logout.png" alt="Logout Icon" />
+        </div>
+    </div>
+
+    <!-- Popup tạo nhóm -->
+    <div class="overlay" id="create-group-overlay"></div>
+    <div class="popup" id="create-group-popup">
+        <h3>Tạo nhóm mới</h3>
+        <input type="text" id="new-group-name" placeholder="Nhập tên nhóm">
+        <div style="display: flex; gap: 10px;">
+            <button id="create-group-ok" class="btn btn-primary">Ok</button>
+            <button id="create-group-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Popup đăng xuất -->
+    <div class="overlay" id="logout-overlay"></div>
+    <div class="popup" id="logout-popup">
+        <h3>Đăng xuất tài khoản</h3>
+        <p>Thao tác này sẽ đăng xuất bạn khỏi tài khoản hiện tại.</p>
+        <div style="display: flex; gap: 10px;">
+            <button id="logout-ok" class="btn btn-primary">Ok</button>
+            <button id="logout-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Nội dung chính -->
+    <div class="main-content">
+        <div id="default-view">
+            <button class="btn-join-group" id="join-group">Tham gia nhóm</button>
+        </div>
+        <div id="group-content" style="display: none;">
+            <!-- Nội dung nhóm sẽ được thêm vào đây -->
+        </div>
+    </div>
+
+    <!-- Popup nhập mã nhóm -->
+    <div class="overlay" id="overlay"></div>
+    <div class="popup" id="popup">
+        <h3>Nhập mã nhóm</h3>
+        <input type="text" id="group-code" placeholder="Nhập mã nhóm">
+        <button id="confirm-join">Xác nhận</button>
+    </div>
+
+    <!-- Popup tạo cuộc họp -->
+    <div id="meeting-overlay" class="overlay"></div>
+    <div id="meeting-popup" class="popup">
+        <h3>Tạo cuộc họp mới</h3>
+        <div class="meeting-controls">
+            <button class="control-btn" id="mic-control" title="Microphone">
+                <img src="../assets/mic-on.png" alt="Microphone">
+            </button>
+            <button class="control-btn" id="camera-control" title="Camera">
+                <img src="../assets/camera-on.png" alt="Camera">
+            </button>
+        </div>
+        <div class="popup-actions">
+            <button id="meeting-ok" class="btn btn-primary">Ok</button>
+            <button id="meeting-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <script src="../scripts/renderer.js"></script>
+
+</body>
+</html>

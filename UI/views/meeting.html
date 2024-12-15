@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Room</title>
+    <link rel="stylesheet" href="../styles/meeting.css">
+</head>
+<body>
+    <div class="meeting-container">
+        <button id="leave-meeting" class="btn-danger">Leave</button>
+        
+        <div class="participants-container">
+            <div id="self" class="participant">
+                <video id="self-video" autoplay muted></video>
+                <p>You</p>
+            </div>
+        </div>
+    
+        <div class="meeting-controls">
+            <button id="toggle-mic" class="control-btn" title="Toggle microphone">
+                <img src="../assets/mic-on.png" alt="Microphone">
+            </button>
+            <button id="toggle-camera" class="control-btn" title="Toggle camera">
+                <img src="../assets/camera-on.png" alt="Camera">
+            </button>
+            <button id="toggle-translation" class="control-btn" title="Toggle sign language translation">
+                <img src="../assets/sign-language.png" alt="Translation">
+            </button>
+        </div>
+    </div>
+
+    <!-- Popup thoát cuộc họp -->
+    <div id="leave-meeting-overlay" class="overlay"></div>
+    <div id="leave-meeting-popup" class="popup">
+        <h3>Rời khỏi cuộc họp</h3>
+        <p>Thao tác này sẽ rời bạn khỏi cuộc họp.</p>
+        <div class="popup-actions">
+            <button id="leave-meeting-ok" class="btn btn-primary">Ok</button>
+            <button id="leave-meeting-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <script src="../scripts/meeting.js"></script>
+</body>
+</html>

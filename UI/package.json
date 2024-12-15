@@ -1,0 +1,27 @@
+{
+  "comments": {
+    "how_to_install": "Run 'npm install' to install dependencies"
+  },
+  "name": "ui",
+  "version": "1.0.0",
+  "main": "./scripts/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start-python": "python ../backend/main.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "electron": "^33.2.1"
+  },
+  "dependencies": {
+    "@electron/remote": "^2.1.2",
+    "python-shell": "^5.0.0"
+  },
+  "permissions": [
+    "audioCapture",
+    "videoCapture"
+  ]
+}
