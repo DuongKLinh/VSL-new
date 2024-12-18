@@ -1,2 +1,2 @@
-# VSL-Duong
-VSL-Translator Duong's version
+# VSL-new
+A new VSL-Translator version
