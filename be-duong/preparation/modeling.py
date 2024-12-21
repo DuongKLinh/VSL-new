@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import os
 from keras.models import load_model # type: ignore
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from keras.layers import BatchNormalization, Bidirectional # type: ignore
+from keras.callbacks import ReduceLROnPlateau # type: ignore
 
 class CNNLSTMModel:
     def __init__(self, input_shape, num_classes):
@@ -18,34 +20,40 @@ class CNNLSTMModel:
         self.model = self._build_model()
 
     def _build_model(self):
-        model = Sequential()
+        model = Sequential([
+            # Block 1: Xử lý đặc trưng thời gian
+            Conv1D(32, kernel_size=5, activation='relu', padding='same', input_shape=self.input_shape),
+            BatchNormalization(),
+            MaxPooling1D(pool_size=2),
+            
+            # Block 2: Trích xuất đặc trưng chi tiết
+            Conv1D(64, kernel_size=3, activation='relu', padding='same'),
+            BatchNormalization(),
+            MaxPooling1D(pool_size=2),
+            
+            # Block 3: Xử lý chuỗi thời gian
+            Bidirectional(LSTM(64, return_sequences=True)),
+            Bidirectional(LSTM(32)),
+            
+            # Block 4: Phân loại
+            Dense(64, activation='relu'),
+            BatchNormalization(),
+            Dropout(0.3),
+            Dense(self.num_classes, activation='softmax')
+        ])
 
-        # Conv1D and MaxPooling1D layers
-        model.add(Conv1D(64, kernel_size=3, activation='relu', input_shape=self.input_shape))
-        model.add(MaxPooling1D(pool_size=2))
-
-        # Dropout after Conv1D
-        model.add(Dropout(0.3))  # Dropout 30%
-
-        # Reshape data for LSTM input
-        model.add(Reshape((-1, 64)))  # Reshape to (-1, 64) for LSTM compatibility
-
-        # LSTM layer
-        model.add(LSTM(64, return_sequences=False))
-
-        # Dropout after LSTM
-        model.add(Dropout(0.5))
-
-        # Dense layer with L2 regularization
-        model.add(Dense(self.num_classes, activation='sigmoid', kernel_regularizer=l2(0.01)))
-
-        # Compile the model
-        model.compile(optimizer=Adam(learning_rate=0.001),
-                      loss='mse',
-                      metrics=['accuracy'])
+        # Sử dụng optimizer với learning rate thấp hơn và gradient clipping
+        optimizer = Adam(learning_rate=0.0001, clipnorm=1.0)
+        
+        model.compile(
+            optimizer=optimizer,
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy']
+        )
+        
         return model
 
-    def train(self, train_dataset, epochs=50, patience=5, model_path='best.keras', results_dir='results'):
+    def train(self, train_dataset, validation_dataset=None, epochs=100, patience=10, model_path='best.keras', results_dir='results'):
         # Ensure results directory exists
         os.makedirs(results_dir, exist_ok=True)
         model_path = os.path.join(results_dir, model_path)
@@ -59,13 +67,25 @@ class CNNLSTMModel:
                                             mode='min', 
                                             verbose=1)
 
+        reduce_lr = ReduceLROnPlateau(
+            monitor='val_loss' if validation_dataset else 'loss',
+            factor=0.5,
+            patience=3,
+            min_lr=1e-6,
+            verbose=1
+        )
+        
+        # Thêm reduce_lr vào danh sách callbacks
+        callbacks = [early_stopping, model_checkpoint, reduce_lr]
+        
         # Train the model
         print("Training the model...")
         history = self.model.fit(
             train_dataset,
             epochs=epochs,
+            validation_data=validation_dataset,
             verbose=1,
-            callbacks=[early_stopping, model_checkpoint]
+            callbacks=callbacks
         )
 
         print(f"Training complete. Best model saved as '{model_path}'")
