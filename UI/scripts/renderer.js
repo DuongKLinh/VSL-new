@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, clipboard } = require('electron');
 const path = require('path');
 
 let loginWindow;
@@ -108,21 +108,26 @@ ipcMain.on('open-meeting-window', (event, mediaState) => {
 
 
 // Lắng nghe sự kiện mở giao diện chính
-ipcMain.on('open-main-window', () => {
-
+ipcMain.on('open-main-window', (event, data) => {
     if (!mainWindow || mainWindow.isDestroyed()) {
         console.log('mainWindow bị hủy hoặc không tồn tại, tạo lại cửa sổ chính.');
         createMainWindow();
-        mainWindow.show(); 
+        // Gửi userCode đến main window
+        mainWindow.webContents.on('did-finish-load', () => {
+            mainWindow.webContents.send('user-code', data.userCode);
+        });
+        mainWindow.show();
     } else if (mainWindow) {
         console.log('mainWindow tồn tại, hiển thị lại và làm nổi cửa sổ chính.');
-        mainWindow.show(); // Hiển thị lại
-        mainWindow.focus(); // Làm nổi cửa sổ
+        mainWindow.show();
+        mainWindow.focus();
+        // Gửi userCode đến main window
+        mainWindow.webContents.send('user-code', data.userCode);
     }
 
     if (loginWindow && loginWindow.isVisible()) {
         console.log('Ẩn cửa sổ loginWindow.');
-        loginWindow.hide(); // Ẩn cửa sổ đăng nhập
+        loginWindow.hide();
     }
 });
 
@@ -168,3 +173,8 @@ ipcMain.on('show-logout-dialog', () => {
     });
 });
 
+// copy-to-clipboard
+ipcMain.on('copy-to-clipboard', (event, text) => {
+    clipboard.writeText(text);
+    event.reply('copy-success');
+});

@@ -10,6 +10,7 @@ const { ipcRenderer } = require('electron');
 
 // Trạng thái panel
 let isOpen = true;
+let currentUserCode = '';
 
 // Xử lý đóng/mở panel lịch sử
 toggleButton.addEventListener('click', () => {
@@ -18,22 +19,31 @@ toggleButton.addEventListener('click', () => {
     toggleButton.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
 });
 
-// Xử lý copy mã người dùng
+// Lắng nghe sự kiện user-code từ main process
+ipcRenderer.on('user-code', (event, userCode) => {
+    currentUserCode = userCode;
+    const userCodeElement = document.querySelector('.user-code');
+    if (userCodeElement) {
+        userCodeElement.textContent = `Mã của bạn: ${userCode}`;
+    }
+});
+
+// Copy code
 copyButton.addEventListener('click', () => {
-    // Lấy mã từ nội dung text (bỏ "Mã của bạn: " ở đầu)
     const code = userCode.textContent.replace('Mã của bạn: ', '');
+    ipcRenderer.send('copy-to-clipboard', code);
+});
+
+// Thêm listener để xử lý thông báo khi copy thành công
+ipcRenderer.on('copy-success', () => {
+    const notification = document.createElement('div');
+    notification.className = 'copy-notification';
+    notification.textContent = 'Sao chép mã thành công!';
+    document.body.appendChild(notification);
     
-    // Copy vào clipboard
-    navigator.clipboard.writeText(code)
-        .then(() => {
-            // Thông báo thành công
-            alert('Đã sao chép mã thành công!');
-        })
-        .catch(err => {
-            // Xử lý lỗi
-            console.error('Không thể sao chép mã:', err);
-            alert('Không thể sao chép mã. Vui lòng thử lại!');
-        });
+    setTimeout(() => {
+        notification.remove();
+    }, 1700);
 });
 
 // Nút tạo cuộc họp
@@ -136,6 +146,9 @@ if (logoutOverlay) {
 if (logoutOk) {
     logoutOk.addEventListener('click', () => {
         console.log('Người dùng đã đăng xuất!');
+        // Xóa thông tin người dùng khi đăng xuất
+        localStorage.removeItem('currentUser');
+        currentUserCode = '';
         logoutPopup.style.display = 'none';
         logoutOverlay.style.display = 'none';
         ipcRenderer.send('show-login-window');
