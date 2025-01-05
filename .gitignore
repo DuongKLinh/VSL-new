@@ -165,7 +165,8 @@ cython_debug/
 backend/data/landmarks/*
 backend/data/training_data/*
 backend/models/*
+
 # src/preparation/check.py
 app_require.txt
-be-duong/dataset/data/*
-be-duong/preparation/results/*
+Backend/dataset/data/*
+Backend/preparation/results/*

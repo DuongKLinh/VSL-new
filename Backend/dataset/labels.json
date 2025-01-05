@@ -1,0 +1,52 @@
+{
+    "xinchao": {
+        "index": 0,
+        "label_with_diacritics": "xin chào",
+        "is_dynamic": true
+    },
+    "camon": {
+        "index": 1,
+        "label_with_diacritics": "cảm ơn",
+        "is_dynamic": true
+    },
+    "xinloi": {
+        "index": 2,
+        "label_with_diacritics": "xin lỗi",
+        "is_dynamic": true
+    },
+    "toi": {
+        "index": 3,
+        "label_with_diacritics": "tôi",
+        "is_dynamic": true
+    },
+    "ten": {
+        "index": 4,
+        "label_with_diacritics": "tên",
+        "is_dynamic": true
+    },
+    "la": {
+        "index": 5,
+        "label_with_diacritics": "là",
+        "is_dynamic": true
+    },
+    "l": {
+        "index": 6,
+        "label_with_diacritics": "l",
+        "is_dynamic": false
+    },
+    "i": {
+        "index": 7,
+        "label_with_diacritics": "i",
+        "is_dynamic": false
+    },
+    "n": {
+        "index": 8,
+        "label_with_diacritics": "n",
+        "is_dynamic": false
+    },
+    "h": {
+        "index": 9,
+        "label_with_diacritics": "h",
+        "is_dynamic": false
+    }
+}
