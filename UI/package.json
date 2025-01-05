@@ -4,7 +4,7 @@
   },
   "name": "ui",
   "version": "1.0.0",
-  "main": "./scripts/main.js",
+  "main": "./scripts/renderer.js",
   "scripts": {
     "start": "electron .",
     "start-python": "python ../backend/main.py"

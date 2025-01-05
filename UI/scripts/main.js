@@ -1,168 +1,144 @@
-const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
-const path = require('path');
+// Lấy các phần tử DOM
+const historyPanel = document.getElementById('historyPanel');
+const toggleButton = document.getElementById('toggleButton');
+const copyButton = document.querySelector('.copy-button');
+const userCode = document.querySelector('.user-code');
+const createCallButton = document.querySelector('.create-call-button');
 
-let loginWindow;
-let mainWindow;
-let meetingWindow;
+// Khởi tạo ipcRenderer
+const { ipcRenderer } = require('electron');
 
-app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer');
-// Hàm tạo cửa sổ login
-function createLoginWindow() {
-    loginWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: true,
-            contextIsolation: false,
-        },
-    });
-    loginWindow.loadFile('views/login.html');
-}
+// Trạng thái panel
+let isOpen = true;
 
-// Hàm tạo cửa sổ main
-function createMainWindow() {
-    console.log('Tạo mới mainWindow.');
-    mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: true, // Đảm bảo đã bật
-            contextIsolation: false, // Đảm bảo đã tắt
-        },
-    });
+// Xử lý đóng/mở panel lịch sử
+toggleButton.addEventListener('click', () => {
+    isOpen = !isOpen;
+    historyPanel.classList.toggle('closed');
+    toggleButton.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+});
 
-    console.log('Tải file main.html cho mainWindow.');
-    mainWindow.loadFile('views/main.html'); // Đường dẫn đúng đến main.html
-
-    mainWindow.on('closed', () => {
-        console.log('mainWindow đã bị đóng.');
-        mainWindow = null; // Đặt về null khi cửa sổ bị đóng
-    });
-}
-
-
-
-app.on('ready', () => {
-    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-        if (permission === 'media') {
-            callback(true);
-        } else {
-            callback(false);
-        }
-    });
+// Xử lý copy mã người dùng
+copyButton.addEventListener('click', () => {
+    // Lấy mã từ nội dung text (bỏ "Mã của bạn: " ở đầu)
+    const code = userCode.textContent.replace('Mã của bạn: ', '');
     
-    createLoginWindow();
+    // Copy vào clipboard
+    navigator.clipboard.writeText(code)
+        .then(() => {
+            // Thông báo thành công
+            alert('Đã sao chép mã thành công!');
+        })
+        .catch(err => {
+            // Xử lý lỗi
+            console.error('Không thể sao chép mã:', err);
+            alert('Không thể sao chép mã. Vui lòng thử lại!');
+        });
 });
 
+// Nút tạo cuộc họp
+createCallButton.addEventListener('click', () => {
+    const meetingPopup = document.getElementById('meeting-popup');
+    const meetingOverlay = document.getElementById('meeting-overlay');
+    const micControl = document.getElementById('mic-control');
+    const cameraControl = document.getElementById('camera-control');
+    const meetingOkButton = document.getElementById('meeting-ok');
+    const meetingCancel = document.getElementById('meeting-cancel');
 
-// Hàm tạo cửa sổ meeting
-function createMeetingWindow() {
-    meetingWindow = new BrowserWindow({
-        width: 1300,
-        height: 900,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: true,
-            contextIsolation: false,
-            webSecurity: true,
-            enableWebRTC: true
-        }
+    // Hiển thị popup
+    meetingPopup.style.display = 'block';
+    meetingOverlay.style.display = 'block';
+
+    // Xử lý đóng popup
+    const closeMeetingPopup = () => {
+        meetingPopup.style.display = 'none';
+        meetingOverlay.style.display = 'none';
+    }
+
+    // Xử lý nút ok trong popup
+    if (meetingOkButton) {
+        meetingOkButton.addEventListener('click', () => {
+            const micControl = document.getElementById('mic-control');
+            const cameraControl = document.getElementById('camera-control');
+            
+            // Lấy trạng thái hiện tại của mic và camera
+            const micEnabled = micControl.querySelector('img').src.includes('mic-on.png');
+            const cameraEnabled = cameraControl.querySelector('img').src.includes('camera-on.png');
+            
+            // Gửi sự kiện mở cửa sổ meeting kèm theo trạng thái
+            ipcRenderer.send('open-meeting-window', { micEnabled, cameraEnabled });
+            
+            const meetingPopup = document.getElementById('meeting-popup');
+            const meetingOverlay = document.getElementById('meeting-overlay');
+            if (meetingPopup && meetingOverlay) {
+                meetingPopup.style.display = 'none';
+                meetingOverlay.style.display = 'none';
+            }
+        });
+    }
+
+    if (meetingCancel) meetingCancel.addEventListener('click', closeMeetingPopup);
+    if (meetingOverlay) meetingOverlay.addEventListener('click', closeMeetingPopup);
+
+    // Xử lý nút microphone
+    if (micControl) {
+        micControl.addEventListener('click', () => {
+            const micImg = micControl.querySelector('img');
+            const isMicOn = micImg.src.includes('mic-on.png');
+            micImg.src = isMicOn ? '../assets/mic-off.png' : '../assets/mic-on.png';
+            micControl.title = isMicOn ? 'Bật microphone' : 'Tắt microphone';
+        });
+    }
+
+    // Xử lý nút camera
+    if (cameraControl) {
+        cameraControl.addEventListener('click', () => {
+            const cameraImg = cameraControl.querySelector('img');
+            const isCameraOn = cameraImg.src.includes('camera-on.png');
+            cameraImg.src = isCameraOn ? '../assets/camera-off.png' : '../assets/camera-on.png';
+            cameraControl.title = isCameraOn ? 'Bật camera' : 'Tắt camera';
+        });
+    }
+
+});
+
+// Xử lý đăng xuất -----------------------------------------------------
+const logoutButton = document.getElementById('logout-button');
+const logoutPopup = document.getElementById('logout-popup');
+const logoutOverlay = document.getElementById('logout-overlay');
+const logoutOk = document.getElementById('logout-ok');
+const logoutCancel = document.getElementById('logout-cancel');
+
+if (logoutButton) {
+    logoutButton.addEventListener('click', () => {
+        console.log('Nút Logout được nhấn!');
+        logoutPopup.style.display = 'block';
+        logoutOverlay.style.display = 'block';
     });
-
-    // Cấu hình quyền truy cập media cho cửa sổ meeting
-    meetingWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-        const allowedPermissions = ['media'];
-        if (allowedPermissions.includes(permission)) {
-            callback(true);
-        } else {
-            callback(false);
-        }
-    });
-
-    meetingWindow.loadFile('views/meeting.html');
-
-    // Bắt sự kiện khi trang web được tải xong
-    meetingWindow.webContents.on('did-finish-load', () => {
-        meetingWindow.webContents.send('verify-permissions');
-    });
-
-    return meetingWindow;
 }
 
-// Lắng nghe sự kiện từ renderer để mở cửa sổ phòng họp
-ipcMain.on('open-meeting-window', (event, mediaState) => {
-    if (!meetingWindow || meetingWindow.isDestroyed()) {
-        meetingWindow = createMeetingWindow();
-        // Gửi trạng thái media đến cửa sổ meeting
-        meetingWindow.webContents.on('did-finish-load', () => {
-            meetingWindow.webContents.send('initial-media-state', mediaState);
-        });
-    } else {
-        meetingWindow.focus();
-    }
-});
-
-
-// Lắng nghe sự kiện mở giao diện chính
-ipcMain.on('open-main-window', () => {
-
-    if (!mainWindow || mainWindow.isDestroyed()) {
-        console.log('mainWindow bị hủy hoặc không tồn tại, tạo lại cửa sổ chính.');
-        createMainWindow();
-        mainWindow.show(); 
-    } else if (mainWindow) {
-        console.log('mainWindow tồn tại, hiển thị lại và làm nổi cửa sổ chính.');
-        mainWindow.show(); // Hiển thị lại
-        mainWindow.focus(); // Làm nổi cửa sổ
-    }
-
-    if (loginWindow && loginWindow.isVisible()) {
-        console.log('Ẩn cửa sổ loginWindow.');
-        loginWindow.hide(); // Ẩn cửa sổ đăng nhập
-    }
-});
-
-
-ipcMain.on('show-login-window', () => {
-    loginWindow.show();
-});
-
-ipcMain.on('hide-main-window', () => {
-    mainWindow.hide();
-});
-
-ipcMain.on('close-meeting-window', () => {
-    meetingWindow.close();
-});
-
-ipcMain.on('show-login-error-dialog', () => {
-    dialog.showErrorBox('Login Error', 'Please enter valid username and password!');
-});
-
-// Lắng nghe sự kiện logout
-ipcMain.on('show-logout-dialog', () => {
-    dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        buttons: ['Ok', 'Cancel'],
-        defaultId: 0,
-        cancelId: 1,
-        title: 'Logout',
-        message: 'Do you really want to logout?',
-    }).then((result) => {
-        if (result.response === 0) {
-            console.log('Người dùng đã đăng xuất!');
-            if (mainWindow) {
-                mainWindow.hide(); // Ẩn cửa sổ chính
-            }
-            if (loginWindow) {
-                loginWindow.show(); // Hiển thị cửa sổ đăng nhập
-                loginWindow.focus(); // Làm nổi cửa sổ đăng nhập
-            }
-        } else {
-            console.log('Người dùng đã hủy đăng xuất!');
-        }
+if (logoutCancel) {
+    logoutCancel.addEventListener('click', () => {
+        console.log('Popup đăng xuất bị hủy!');
+        logoutPopup.style.display = 'none';
+        logoutOverlay.style.display = 'none';
     });
-});
+}
 
+if (logoutOverlay) {
+    logoutOverlay.addEventListener('click', () => {
+        console.log('Overlay của popup đăng xuất bị nhấn!');
+        logoutPopup.style.display = 'none';
+        logoutOverlay.style.display = 'none';
+    });
+}
+
+if (logoutOk) {
+    logoutOk.addEventListener('click', () => {
+        console.log('Người dùng đã đăng xuất!');
+        logoutPopup.style.display = 'none';
+        logoutOverlay.style.display = 'none';
+        ipcRenderer.send('show-login-window');
+        ipcRenderer.send('hide-main-window');
+    });
+}

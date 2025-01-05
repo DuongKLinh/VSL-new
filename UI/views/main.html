@@ -1,36 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Main</title>
-    <link rel="stylesheet" href="../styles/main.css"> <!-- Liên kết tới file style.css -->
+    <title>Hệ thống gọi điện</title>
+    <link rel="stylesheet" href="../styles/main.css">
 </head>
-
 <body>
-    <!-- Thanh dọc bên trái -->
-    <div class="sidebar">
-        <div class="add-group" id="create-group">+</div>
-        <div class="divider"></div>
-        <div class="group-container">
-            <!-- <div class="group">
-                <div class="group-icon">TG</div>
-            </div> -->
+    <!-- Panel lịch sử cuộc gọi -->
+    <div id="historyPanel" class="history-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">Lịch sử cuộc gọi</h2>
         </div>
-        <!-- Nút Logout -->
-        <div id="logout-button" class="logout-btn">
-            <img src="../assets/logout.png" alt="Logout Icon" />
+        <div class="call-history">
+            <div class="call-item"></div>
+            <div class="call-item"></div>
+            <div class="call-item"></div>
+            <div class="call-item"></div>
+            <div class="call-item"></div>
         </div>
     </div>
 
-    <!-- Popup tạo nhóm -->
-    <div class="overlay" id="create-group-overlay"></div>
-    <div class="popup" id="create-group-popup">
-        <h3>Tạo nhóm mới</h3>
-        <input type="text" id="new-group-name" placeholder="Nhập tên nhóm">
-        <div style="display: flex; gap: 10px;">
-            <button id="create-group-ok" class="btn btn-primary">Ok</button>
-            <button id="create-group-cancel" class="btn btn-secondary">Cancel</button>
+    <!-- Nút điều khiển panel -->
+    <button id="toggleButton" class="toggle-button">&lt;</button>
+
+    <!-- Khu vực chính -->
+    <div class="main-content">
+        <div class="call-controls">
+            <input type="text" class="user-id-input" placeholder="Mã người dùng">
+            <button class="create-call-button">Tạo cuộc gọi</button>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            
+            <!-- Nút Logout -->
+            <div id="logout-button" class="logout-btn">
+                <img src="../assets/logout.png" alt="Logout Icon" class="icon-default"/>
+                <img src="../assets/logout_white.png" alt="Logout Icon" class="icon-hover" />
+            </div>
+            
+            <span class="user-code">Mã của bạn: abc</span>
+            <button class="copy-button" title="Copy mã">
+                <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 4v12a2 2 0 002 2h8a2 2 0 002-2V7.242a2 2 0 00-.602-1.43L16.083 2.57A2 2 0 0014.685 2H10a2 2 0 00-2 2z"></path>
+                    <path d="M16 18v2a2 2 0 01-2 2H6a2 2 0 01-2-2V9a2 2 0 012-2h2"></path>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -43,24 +59,6 @@
             <button id="logout-ok" class="btn btn-primary">Ok</button>
             <button id="logout-cancel" class="btn btn-secondary">Cancel</button>
         </div>
-    </div>
-
-    <!-- Nội dung chính -->
-    <div class="main-content">
-        <div id="default-view">
-            <button class="btn-join-group" id="join-group">Tham gia nhóm</button>
-        </div>
-        <div id="group-content" style="display: none;">
-            <!-- Nội dung nhóm sẽ được thêm vào đây -->
-        </div>
-    </div>
-
-    <!-- Popup nhập mã nhóm -->
-    <div class="overlay" id="overlay"></div>
-    <div class="popup" id="popup">
-        <h3>Nhập mã nhóm</h3>
-        <input type="text" id="group-code" placeholder="Nhập mã nhóm">
-        <button id="confirm-join">Xác nhận</button>
     </div>
 
     <!-- Popup tạo cuộc họp -->
@@ -81,7 +79,6 @@
         </div>
     </div>
 
-    <script src="../scripts/renderer.js"></script>
-
+    <script src="../scripts/main.js"></script>
 </body>
 </html>
