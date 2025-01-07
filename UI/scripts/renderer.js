@@ -5,6 +5,18 @@ let loginWindow;
 let mainWindow;
 let meetingWindow;
 
+ipcMain.on('show-error', (event, message) => {
+    dialog.showErrorBox('Lỗi', message);
+});
+
+ipcMain.on('show-notification', (event, data) => {
+    dialog.showMessageBox(null, {
+        type: 'info',
+        title: data.title,
+        message: data.message
+    });
+});
+
 app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer');
 // Hàm tạo cửa sổ login
 function createLoginWindow() {
@@ -18,8 +30,6 @@ function createLoginWindow() {
         },
     });
     loginWindow.loadFile('views/login.html');
-    const userName = document.getElementById('username')
-    userName.focus();
 }
 
 // Hàm tạo cửa sổ main
@@ -94,18 +104,21 @@ function createMeetingWindow() {
 }
 
 // Lắng nghe sự kiện từ renderer để mở cửa sổ phòng họp
-ipcMain.on('open-meeting-window', (event, mediaState) => {
+ipcMain.on('open-meeting-window', (event, data) => {
     if (!meetingWindow || meetingWindow.isDestroyed()) {
         meetingWindow = createMeetingWindow();
-        // Gửi trạng thái media đến cửa sổ meeting
+        // Gửi trạng thái media và targetCode đến cửa sổ meeting
         meetingWindow.webContents.on('did-finish-load', () => {
-            meetingWindow.webContents.send('initial-media-state', mediaState);
+            meetingWindow.webContents.send('initial-meeting-data', {
+                micEnabled: data.micEnabled,
+                cameraEnabled: data.cameraEnabled,
+                targetCode: data.targetCode
+            });
         });
     } else {
         meetingWindow.focus();
     }
 });
-
 
 // Lắng nghe sự kiện mở giao diện chính
 ipcMain.on('open-main-window', (event, data) => {

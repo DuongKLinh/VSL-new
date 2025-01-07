@@ -5,3 +5,5 @@ pillow
 fastapi
 uvicorn
 python-multipart
+uvicorn[standard]
+websockets

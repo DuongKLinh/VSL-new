@@ -3,6 +3,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const { ipcRenderer } = require('electron');
 
+    const usernameInput = document.getElementById('username');
+    if (usernameInput) {
+        usernameInput.focus();
+    }
+
     // Hàm tạo mã code ngẫu nhiên
     function generateUserCode() {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

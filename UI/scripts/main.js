@@ -5,12 +5,14 @@ const copyButton = document.querySelector('.copy-button');
 const userCode = document.querySelector('.user-code');
 const createCallButton = document.querySelector('.create-call-button');
 
-// Khởi tạo ipcRenderer
+// Khởi tạo
 const { ipcRenderer } = require('electron');
+const WebRTCHandler = require('../scripts/webrtc_handler');
 
 // Trạng thái panel
 let isOpen = true;
 let currentUserCode = '';
+let webrtcHandler = null;
 
 // Xử lý đóng/mở panel lịch sử
 toggleButton.addEventListener('click', () => {
@@ -26,7 +28,52 @@ ipcRenderer.on('user-code', (event, userCode) => {
     if (userCodeElement) {
         userCodeElement.textContent = `Mã của bạn: ${userCode}`;
     }
+    
+    // Khởi tạo WebRTC handler với user code
+    initializeWebRTC(userCode);
 });
+
+// Khởi tạo WebRTC
+async function initializeWebRTC(userCode) {
+    try {
+        if (!webrtcHandler) {
+            webrtcHandler = new WebRTCHandler(userCode);
+            
+            webrtcHandler.onCallReceived = (message) => {
+                const targetCode = message.from;
+                showIncomingCallPopup(targetCode);
+            };
+
+            webrtcHandler.onCallRejected = () => {
+                ipcRenderer.send('show-notification', {
+                    title: 'Cuộc gọi bị từ chối',
+                    message: 'Người dùng đã từ chối cuộc gọi'
+                });
+            };
+
+            webrtcHandler.onError = (error) => {
+                console.error('Lỗi WebRTC:', error);
+                ipcRenderer.send('show-notification', {
+                    title: 'Lỗi kết nối',
+                    message: 'Không thể thiết lập kết nối. Vui lòng thử lại sau.'
+                });
+            };
+
+            await webrtcHandler.initialize();
+        }
+    } catch (error) {
+        console.error('Lỗi khởi tạo WebRTC:', error);
+        ipcRenderer.send('show-notification', {
+            title: 'Lỗi khởi tạo',
+            message: 'Không thể khởi tạo kết nối. Vui lòng kiểm tra kết nối mạng.'
+        });
+        
+        // Thử lại sau 5 giây
+        setTimeout(() => {
+            initializeWebRTC(userCode);
+        }, 5000);
+    }
+}
 
 // Copy code
 copyButton.addEventListener('click', () => {
@@ -47,7 +94,24 @@ ipcRenderer.on('copy-success', () => {
 });
 
 // Nút tạo cuộc họp
+// Xử lý nút tạo cuộc gọi và popup
 createCallButton.addEventListener('click', () => {
+    const userIdInput = document.querySelector('.user-id-input');
+    const targetCode = userIdInput.value.trim();
+
+    // Kiểm tra mã người dùng nhập vào
+    if (!targetCode) {
+        ipcRenderer.send('show-error', 'Vui lòng nhập mã người dùng');
+        return;
+    }
+
+    // Kiểm tra không cho phép gọi chính mình
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    if (targetCode === currentUser.userCode) {
+        ipcRenderer.send('show-error', 'Không thể gọi cho chính mình');
+        return;
+    }
+
     const meetingPopup = document.getElementById('meeting-popup');
     const meetingOverlay = document.getElementById('meeting-overlay');
     const micControl = document.getElementById('mic-control');
@@ -65,51 +129,55 @@ createCallButton.addEventListener('click', () => {
         meetingOverlay.style.display = 'none';
     }
 
-    // Xử lý nút ok trong popup
-    if (meetingOkButton) {
-        meetingOkButton.addEventListener('click', () => {
-            const micControl = document.getElementById('mic-control');
-            const cameraControl = document.getElementById('camera-control');
-            
-            // Lấy trạng thái hiện tại của mic và camera
-            const micEnabled = micControl.querySelector('img').src.includes('mic-on.png');
-            const cameraEnabled = cameraControl.querySelector('img').src.includes('camera-on.png');
-            
-            // Gửi sự kiện mở cửa sổ meeting kèm theo trạng thái
-            ipcRenderer.send('open-meeting-window', { micEnabled, cameraEnabled });
-            
-            const meetingPopup = document.getElementById('meeting-popup');
-            const meetingOverlay = document.getElementById('meeting-overlay');
-            if (meetingPopup && meetingOverlay) {
-                meetingPopup.style.display = 'none';
-                meetingOverlay.style.display = 'none';
-            }
-        });
-    }
-
-    if (meetingCancel) meetingCancel.addEventListener('click', closeMeetingPopup);
-    if (meetingOverlay) meetingOverlay.addEventListener('click', closeMeetingPopup);
-
-    // Xử lý nút microphone
+    // Xử lý nút microphone trong popup
     if (micControl) {
         micControl.addEventListener('click', () => {
             const micImg = micControl.querySelector('img');
             const isMicOn = micImg.src.includes('mic-on.png');
+            // Đổi ảnh mic khi click
             micImg.src = isMicOn ? '../assets/mic-off.png' : '../assets/mic-on.png';
             micControl.title = isMicOn ? 'Bật microphone' : 'Tắt microphone';
         });
     }
 
-    // Xử lý nút camera
+    // Xử lý nút camera trong popup
     if (cameraControl) {
         cameraControl.addEventListener('click', () => {
             const cameraImg = cameraControl.querySelector('img');
             const isCameraOn = cameraImg.src.includes('camera-on.png');
+            // Đổi ảnh camera khi click
             cameraImg.src = isCameraOn ? '../assets/camera-off.png' : '../assets/camera-on.png';
             cameraControl.title = isCameraOn ? 'Bật camera' : 'Tắt camera';
         });
     }
 
+    // Xử lý nút ok trong popup
+    if (meetingOkButton) {
+        meetingOkButton.addEventListener('click', () => {
+            // Lấy trạng thái hiện tại của mic và camera
+            const micEnabled = micControl.querySelector('img').src.includes('mic-on.png');
+            const cameraEnabled = cameraControl.querySelector('img').src.includes('camera-on.png');
+            
+            // Gửi sự kiện mở cửa sổ meeting kèm theo trạng thái và mã người nhận
+            ipcRenderer.send('open-meeting-window', { 
+                micEnabled, 
+                cameraEnabled,
+                targetCode 
+            });
+            
+            closeMeetingPopup();
+        });
+    }
+
+    // Xử lý nút cancel
+    if (meetingCancel) {
+        meetingCancel.addEventListener('click', closeMeetingPopup);
+    }
+
+    // Xử lý click vào overlay
+    if (meetingOverlay) {
+        meetingOverlay.addEventListener('click', closeMeetingPopup);
+    }
 });
 
 // Xử lý đăng xuất -----------------------------------------------------

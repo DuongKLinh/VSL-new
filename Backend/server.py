@@ -1,6 +1,6 @@
-from services.videoprocess_service import VideoProcessor 
-from services.signrecognition_service import SignRecognition
-from preparation.modeling import CNNLSTMModel
+from Backend.services.videoprocess_service import VideoProcessor 
+from Backend.services.signrecognition_service import SignRecognition
+from Backend.preparation.modeling import CNNLSTMModel
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
@@ -32,7 +32,7 @@ class VideoFramesRequest(BaseModel):
     frames: List[str]  # List các frame dạng base64
 
 # Khởi tạo model và các service
-with open('./dataset/labels.json', 'r', encoding='utf-8') as file:
+with open('./Backend/dataset/labels.json', 'r', encoding='utf-8') as file:
     labels_json = json.load(file)
 
 num_classes = len(labels_json)
