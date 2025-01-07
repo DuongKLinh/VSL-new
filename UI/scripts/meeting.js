@@ -150,7 +150,7 @@ function setupVideoFrameCapture() {
 // Gửi frames đến server để xử lý
 async function sendFramesToServer(frames) {
     try {
-        const response = await fetch('http://localhost:8000/api/process-frames', {
+        const response = await fetch('http://192.168.1.8:8000/api/process-frames', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

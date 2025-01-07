@@ -1,3 +1,7 @@
+const config = require('./config');
+const localIP = require('ip').address();
+config.serverIP = localIP;
+
 // Lấy các phần tử DOM
 const historyPanel = document.getElementById('historyPanel');
 const toggleButton = document.getElementById('toggleButton');

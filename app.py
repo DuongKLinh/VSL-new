@@ -5,6 +5,9 @@ import uvicorn
 # Sửa lại import
 from Backend.server import app as recognition_app
 from signaling.signaling_server import app as signaling_app
+import argparse
+import os
+import socket
 
 class VSLTranslator:
     def __init__(self):
@@ -27,9 +30,49 @@ class VSLTranslator:
     def start_recognition_server(self):
         """Khởi động recognition server"""
         try:
+            # Kiểm tra port có sẵn sàng không
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex(('127.0.0.1', 8000))
+            if result == 0:
+                print("Port 8000 đang được sử dụng. Vui lòng đóng ứng dụng đang sử dụng port này.")
+                sys.exit(1)
+            sock.close()
+            
+            # Kiểm tra các file model cần thiết
+            model_path = 'Backend/preparation/results/best.keras'
+            labels_path = './Backend/dataset/labels.json'
+            
+            if not os.path.exists(model_path):
+                print(f"Không tìm thấy file model tại: {model_path}")
+                sys.exit(1)
+                
+            if not os.path.exists(labels_path):
+                print(f"Không tìm thấy file labels tại: {labels_path}")
+                sys.exit(1)
+                
+            print("Tất cả các file cần thiết đã sẵn sàng")
+            
+            try:
+                # Thử import các module cần thiết
+                import mediapipe
+                import tensorflow
+                import fastapi
+                print("Đã kiểm tra các thư viện cần thiết")
+            except ImportError as e:
+                print(f"Thiếu thư viện: {str(e)}")
+                print("Vui lòng cài đặt các thư viện bằng lệnh:")
+                print("pip install -r requirements.txt")
+                sys.exit(1)
+
+            # Nếu mọi thứ OK, khởi động server
+            print("Bắt đầu khởi động Recognition Server...")
             uvicorn.run(recognition_app, host="0.0.0.0", port=8000)
         except Exception as e:
-            print(f"Lỗi khi khởi động Recognition Server: {e}")
+            print(f"Lỗi khi khởi động Recognition Server: {str(e)}")
+            print("Chi tiết lỗi:", e)
+            import traceback
+            traceback.print_exc()
             sys.exit(1)
 
     def start_signaling_server(self):
@@ -38,7 +81,7 @@ class VSLTranslator:
             print("Khởi động Signaling Server...")
             uvicorn.run(
                 signaling_app, 
-                host="0.0.0.0", 
+                host="192.168.1.8", 
                 port=8765,
                 ws="websockets",  # Chỉ định rõ websocket backend
                 loop="asyncio"    # Sử dụng asyncio event loop
@@ -74,10 +117,12 @@ class VSLTranslator:
             signaling_thread.start()
             time.sleep(2)  # Đợi 2 giây
             
-            # Kiểm tra các server đã sẵn sàng
+            # Kiểm tra Recognition Server đã sẵn sàng
             if not self.check_servers_ready():
-                print("Không thể khởi động các server. Vui lòng kiểm tra lại.")
+                print("Không thể khởi động Recognition Server. Vui lòng kiểm tra lại.")
                 sys.exit(1)
+                
+            print("Các server đã khởi động thành công.")
             
             # Khởi động Electron app trong main thread
             print("Khởi động giao diện người dùng...")
@@ -103,14 +148,25 @@ class VSLTranslator:
         """Kiểm tra các server đã sẵn sàng chưa"""
         import requests
         try:
-            # Kiểm tra Recognition Server
+            # Chỉ kiểm tra Recognition Server
             recognition_response = requests.get('http://localhost:8000/docs')
-            # Kiểm tra Signaling Server
-            signaling_response = requests.get('http://localhost:8765/docs')
-            return recognition_response.status_code == 200 and signaling_response.status_code == 200
+            return recognition_response.status_code == 200
         except:
             return False
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', choices=['server', 'client'], default='client',
+                       help='Chạy ứng dụng ở chế độ server hoặc client')
+    args = parser.parse_args()
+
     translator = VSLTranslator()
-    translator.run()
+    
+    if args.mode == 'server':
+        # Chế độ server - chạy toàn bộ dịch vụ
+        print("Khởi động ở chế độ server...")
+        translator.run()
+    else:
+        # Chế độ client - chỉ chạy giao diện
+        print("Khởi động ở chế độ client...")
+        translator.start_electron_app()

@@ -10,7 +10,7 @@ class WebSocketHandler:
         """Xử lý kết nối mới"""
         await websocket.accept()
         self.active_connections[user_code] = websocket
-        print(f"User {user_code} connected. Total users: {len(self.active_connections)}")
+        print(f"User {user_code} connected. Active connections: {list(self.active_connections.keys())}")
 
     def disconnect(self, user_code: str):
         """Xử lý ngắt kết nối"""
@@ -30,6 +30,9 @@ class WebSocketHandler:
 
     async def handle_call_offer(self, from_code: str, target_code: str, offer: dict):
         """Xử lý yêu cầu cuộc gọi"""
+        print(f"Handling call offer from {from_code} to {target_code}")
+        print(f"Active connections: {list(self.active_connections.keys())}")
+        
         target_connection = self.get_connection(target_code)
         if target_connection:
             await target_connection.send_json({
@@ -37,8 +40,18 @@ class WebSocketHandler:
                 "from": from_code,
                 "offer": offer
             })
+            print(f"Call offer sent to {target_code}")
             return True
-        return False
+        else:
+            print(f"Target user {target_code} not found")
+            # Thông báo cho người gọi
+            from_connection = self.get_connection(from_code)
+            if from_connection:
+                await from_connection.send_json({
+                    "type": "error",
+                    "message": "Người dùng không trực tuyến hoặc không tồn tại"
+                })
+            return False
 
     async def handle_call_answer(self, from_code: str, target_code: str, answer: dict):
         """Xử lý trả lời cuộc gọi"""

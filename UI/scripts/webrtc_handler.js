@@ -56,7 +56,7 @@ class WebRTCHandler {
     async connectSignalingServer() {
         return new Promise((resolve, reject) => {
             try {
-                const wsUrl = `ws://localhost:8765/ws/${this.userCode}`;
+                const wsUrl = `ws://192.168.1.8:8765/ws/${this.userCode}`;
                 console.log('Đang kết nối tới:', wsUrl);
                 
                 this.websocket = new WebSocket(wsUrl);
