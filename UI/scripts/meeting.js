@@ -1,5 +1,20 @@
 // meeting.js
 
+const handleMediaError = (error) => {
+    let message = 'Lỗi truy cập thiết bị media: ';
+    if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        message += 'Không tìm thấy thiết bị camera hoặc microphone.';
+    } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        message += 'Vui lòng cấp quyền truy cập camera và microphone.';
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        message += 'Thiết bị đang được sử dụng bởi ứng dụng khác.';
+    } else {
+        message += error.message;
+    }
+    console.error(message);
+    ipcRenderer.send('show-error', message);
+};
+
 const localVideo = document.getElementById('self-video');
 const participantsContainer = document.querySelector('.participants-container');
 const micButton = document.getElementById('toggle-mic');
@@ -33,10 +48,14 @@ let isTranslationEnabled = false;
 let frameBuffer = [];
 const FRAMES_TO_SEND = 60;
 const { ipcRenderer } = require('electron');
+const WebRTCHandler = require('../scripts/webrtc_handler');
 
 // Nhận trạng thái ban đầu từ main process
 let initialMicState = true;
 let initialCameraState = true;
+let targetCode = null;
+// Lấy thông tin user từ localStorage
+let userInfo = null;
 
 ipcRenderer.on('initial-meeting-data', (event, data) => {
     initialMicState = data.micEnabled;
@@ -51,20 +70,29 @@ ipcRenderer.on('initial-meeting-data', (event, data) => {
 });
 
 // Khởi tạo WebRTC và media streams
+// Thay thế hàm initializeWebRTC trong meeting.js
 async function initializeWebRTC() {
     try {
-        // Khởi tạo local media stream
+        // Lấy thông tin user từ localStorage
+        userInfo = JSON.parse(localStorage.getItem('currentUser'));
+        if (!userInfo) {
+            throw new Error('Không tìm thấy thông tin người dùng');
+        }
+
+        // Khởi tạo media stream
         const constraints = {
             video: initialCameraState,
             audio: initialMicState
         };
+        console.log('Requesting media with constraints:', constraints);
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
         
         // Hiển thị local video
         if (localVideo) {
+            console.log('Setting local video stream');
             localVideo.srcObject = localStream;
             
-            // Cập nhật trạng thái các track theo thiết lập ban đầu
+            // Cập nhật trạng thái tracks
             if (localStream.getAudioTracks().length > 0) {
                 localStream.getAudioTracks()[0].enabled = initialMicState;
                 isMicOn = initialMicState;
@@ -76,15 +104,32 @@ async function initializeWebRTC() {
         }
 
         // Khởi tạo WebRTC handler
-        initializeWebRTCHandlers();
+        // initializeWebRTCHandlers();
 
-        // Thiết lập video frame capture nếu camera được bật
-        if (initialCameraState) {
-            setupVideoFrameCapture();
+        // Khởi tạo WebRTC handler với local stream
+        if (userInfo && userInfo.userCode) {
+            webrtcHandler = new WebRTCHandler(userInfo.userCode);
+            
+            // Thiết lập callback cho remote stream
+            webrtcHandler.onRemoteStreamReceived = (stream) => {
+                console.log('Received remote stream');
+                if (remoteVideo) {
+                    remoteVideo.srcObject = stream;
+                }
+            };
+
+            await webrtcHandler.initialize(localStream);
+            console.log('WebRTC handler initialized');
+
+            // Bắt đầu cuộc gọi nếu có targetCode
+            if (targetCode) {
+                webrtcHandler.startCall(targetCode);
+            }
         }
 
     } catch (error) {
         console.error('Lỗi khởi tạo media:', error);
+        handleMediaError(error);
     }
 }
 
@@ -103,7 +148,9 @@ function initializeWebRTCHandlers() {
 
     // Thiết lập callback nhận video stream của người kia
     webrtcHandler.onRemoteStreamReceived = (stream) => {
+        console.log('Đã nhận được stream từ xa');
         remoteVideo.srcObject = stream;
+        remoteVideo.play();
     };
 
     // Khởi tạo kết nối

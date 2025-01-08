@@ -7,22 +7,35 @@ class WebRTCHandler {
     constructor(userCode) {
         this.userCode = userCode;
         this.retryCount = 0;
-        // Cấu hình ICE servers
+        // Cập nhật cấu hình ICE servers
         this.configuration = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }
-            ]
+                { 
+                    urls: [
+                        'stun:stun.l.google.com:19302',
+                        'stun:stun1.l.google.com:19302',
+                        'stun:stun2.l.google.com:19302',
+                        'stun:stun3.l.google.com:19302',
+                        'stun:stun4.l.google.com:19302'
+                    ]
+                }
+            ],
+            iceCandidatePoolSize: 10,
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require'
         };
-
+    
         // Các biến quản lý trạng thái
-        this.userCode = userCode;
         this.peerConnection = null;
         this.localStream = null;
         this.websocket = null;
         this.targetCode = null;
-
+    
         // Callback cho remote stream
         this.onRemoteStreamReceived = null;
+        this.onCallReceived = null;
+        this.onCallRejected = null;
+        this.onError = null;  
     }
 
     async initialize(localStream) {
@@ -154,13 +167,20 @@ class WebRTCHandler {
         this.peerConnection = new RTCPeerConnection(this.configuration);
 
         // Thêm local stream
-        this.localStream.getTracks().forEach(track => {
-            this.peerConnection.addTrack(track, this.localStream);
-        });
+        if (this.localStream) {
+            console.log('Adding local stream tracks...');
+            this.localStream.getTracks().forEach(track => {
+                console.log('Adding track:', track.kind);
+                this.peerConnection.addTrack(track, this.localStream);
+            });
+        } else {
+            console.warn('No local stream available');
+        }
 
         // Xử lý ICE candidates
         this.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log('New ICE candidate:', event.candidate.type);
                 this.sendToSignalingServer({
                     type: 'call-candidate',
                     target: this.targetCode,
@@ -169,83 +189,165 @@ class WebRTCHandler {
             }
         };
 
+        // Thêm xử lý trạng thái ICE
+        this.peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', this.peerConnection.iceConnectionState);
+        };
+
+        this.peerConnection.onicegatheringstatechange = () => {
+            console.log('ICE gathering state:', this.peerConnection.iceGatheringState);
+        };
+
         // Xử lý remote stream
         this.peerConnection.ontrack = (event) => {
-            if (this.onRemoteStreamReceived) {
-                this.onRemoteStreamReceived(event.streams[0]);
+            console.log('Received remote track:', event.track.kind);
+            if (event.streams && event.streams[0]) {
+                console.log('Setting remote stream');
+                if (this.onRemoteStreamReceived) {
+                    this.onRemoteStreamReceived(event.streams[0]);
+                }
             }
         };
 
         // Xử lý trạng thái kết nối
         this.peerConnection.onconnectionstatechange = () => {
-            console.log('Trạng thái kết nối:', this.peerConnection.connectionState);
+            console.log('Connection state:', this.peerConnection.connectionState);
+            if (this.peerConnection.connectionState === 'failed') {
+                console.log('Connection failed - restarting ICE');
+                this.peerConnection.restartIce();
+            }
         };
     }
 
     async startCall(targetCode) {
         try {
+            console.log('Starting call to:', targetCode);
             this.targetCode = targetCode;
             await this.createPeerConnection();
-
+    
+            // Tạo offer
             const offer = await this.peerConnection.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true
             });
             
+            // Đặt offer làm local description TRƯỚC KHI gửi
             await this.peerConnection.setLocalDescription(offer);
-
+            console.log('Set local description (offer):', offer.type);
+    
+            // Chờ một chút để đảm bảo ICE gathering hoàn tất
+            await this.waitForIceGathering();
+    
+            // Gửi offer với ICE candidates đã được thu thập
             this.sendToSignalingServer({
                 type: 'call-offer',
                 target: targetCode,
-                offer: offer
+                offer: this.peerConnection.localDescription
             });
+    
+            console.log('Offer created and sent');
         } catch (error) {
-            console.error('Lỗi bắt đầu cuộc gọi:', error);
+            console.error('Error in startCall:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
         }
     }
 
     async handleCallOffer(message) {
         try {
+            console.log('Received offer from:', message.from);
             const { from, offer } = message;
+    
+            if (this.onCallReceived) {
+                this.onCallReceived(message);
+            }
+    
             this.targetCode = from;
             await this.createPeerConnection();
             
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            // Set remote description TRƯỚC
+            const remoteDesc = new RTCSessionDescription(offer);
+            await this.peerConnection.setRemoteDescription(remoteDesc);
+            console.log('Set remote description (offer)');
+    
+            // Sau đó tạo và set local description
             const answer = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(answer);
-
+            console.log('Set local description (answer)');
+    
+            // Chờ ICE gathering hoàn tất
+            await this.waitForIceGathering();
+    
+            // Gửi answer
             this.sendToSignalingServer({
                 type: 'call-answer',
                 target: from,
-                answer: answer
+                answer: this.peerConnection.localDescription
             });
+            console.log('Answer created and sent');
         } catch (error) {
-            console.error('Lỗi xử lý offer:', error);
+            console.error('Error in handleCallOffer:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
         }
     }
 
     async handleCallAnswer(message) {
         try {
+            console.log('Received answer from:', message.from);
             const { answer } = message;
             if (this.peerConnection) {
-                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                const remoteDesc = new RTCSessionDescription(answer);
+                await this.peerConnection.setRemoteDescription(remoteDesc);
+                console.log('Set remote description (answer)');
             }
         } catch (error) {
-            console.error('Lỗi xử lý answer:', error);
+            console.error('Error in handleCallAnswer:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
         }
+    }
+
+    // Hàm đợi ICE gathering hoàn tất
+    async waitForIceGathering() {
+        if (this.peerConnection.iceGatheringState === 'complete') {
+            return;
+        }
+
+        return new Promise((resolve) => {
+            const checkState = () => {
+                if (this.peerConnection.iceGatheringState === 'complete') {
+                    this.peerConnection.removeEventListener('icegatheringstatechange', checkState);
+                    resolve();
+                }
+            };
+
+            this.peerConnection.addEventListener('icegatheringstatechange', checkState);
+
+            // Thêm timeout để tránh đợi quá lâu
+            setTimeout(resolve, 2000);
+        });
     }
 
     async handleNewICECandidate(message) {
         try {
             const { candidate } = message;
-            if (this.peerConnection) {
+            if (this.peerConnection && candidate) {
+                console.log('Adding received ICE candidate');
                 await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log('Successfully added ICE candidate');
             }
         } catch (error) {
-            console.error('Lỗi xử lý ICE candidate:', error);
+            console.error('Error adding received ICE candidate:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
         }
     }
-
+    
     sendToSignalingServer(message) {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify(message));
@@ -255,23 +357,31 @@ class WebRTCHandler {
     }
 
     endCall() {
-        // Đóng peer connection
-        if (this.peerConnection) {
-            this.peerConnection.close();
-            this.peerConnection = null;
+        try {
+            // Dừng tất cả tracks trong localStream
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                this.localStream = null;
+            }
+    
+            // Đóng peer connection
+            if (this.peerConnection) {
+                this.peerConnection.close();
+                this.peerConnection = null;
+            }
+    
+            // Đóng WebSocket
+            if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                this.websocket.close();
+                this.websocket = null;
+            }
+    
+            this.targetCode = null;
+        } catch (error) {
+            console.error('Lỗi khi kết thúc cuộc gọi:', error);
         }
-
-        // Đóng WebSocket
-        if (this.websocket) {
-            this.websocket.close();
-        }
-
-        // Dừng local stream
-        if (this.localStream) {
-            this.localStream.getTracks().forEach(track => track.stop());
-        }
-
-        this.targetCode = null;
     }
 }
 

@@ -1,6 +1,6 @@
-const config = require('./config');
-const localIP = require('ip').address();
-config.serverIP = localIP;
+// const config = require('./config');
+// const localIP = require('ip').address();
+// config.serverIP = localIP;
 
 // Lấy các phần tử DOM
 const historyPanel = document.getElementById('historyPanel');
@@ -40,15 +40,19 @@ ipcRenderer.on('user-code', (event, userCode) => {
 // Khởi tạo WebRTC
 async function initializeWebRTC(userCode) {
     try {
+        console.log('Bắt đầu khởi tạo WebRTC với userCode:', userCode);
         if (!webrtcHandler) {
             webrtcHandler = new WebRTCHandler(userCode);
+            console.log('WebRTC handler được tạo mới');
             
             webrtcHandler.onCallReceived = (message) => {
+                console.log('Nhận được cuộc gọi từ:', message.from);
                 const targetCode = message.from;
                 showIncomingCallPopup(targetCode);
             };
 
             webrtcHandler.onCallRejected = () => {
+                console.log('Cuộc gọi bị từ chối');
                 ipcRenderer.send('show-notification', {
                     title: 'Cuộc gọi bị từ chối',
                     message: 'Người dùng đã từ chối cuộc gọi'
@@ -64,6 +68,9 @@ async function initializeWebRTC(userCode) {
             };
 
             await webrtcHandler.initialize();
+            console.log('WebRTC handler đã khởi tạo xong');
+        } else {
+            console.log('WebRTC handler đã tồn tại');
         }
     } catch (error) {
         console.error('Lỗi khởi tạo WebRTC:', error);
@@ -169,6 +176,13 @@ createCallButton.addEventListener('click', () => {
                 targetCode 
             });
             
+            if (webrtcHandler) {
+                console.log('Bắt đầu cuộc gọi tới:', targetCode);
+                webrtcHandler.startCall(targetCode);
+            } else {
+                console.error('WebRTC handler chưa được khởi tạo');
+            }
+
             closeMeetingPopup();
         });
     }
@@ -226,4 +240,55 @@ if (logoutOk) {
         ipcRenderer.send('show-login-window');
         ipcRenderer.send('hide-main-window');
     });
+}
+
+// Xử lý popup cuộc gọi đến
+function showIncomingCallPopup(callerCode) {
+    const incomingCallPopup = document.getElementById('incoming-call-popup');
+    const incomingCallOverlay = document.getElementById('incoming-call-overlay');
+    const callerId = document.getElementById('caller-id');
+    const acceptCallButton = document.getElementById('accept-call');
+    const rejectCallButton = document.getElementById('reject-call');
+
+    // Hiển thị mã người gọi
+    callerId.textContent = callerCode;
+
+    // Hiển thị popup
+    incomingCallPopup.style.display = 'block';
+    incomingCallOverlay.style.display = 'block';
+
+    // Xử lý nút chấp nhận cuộc gọi
+    acceptCallButton.onclick = () => {
+        incomingCallPopup.style.display = 'none';
+        incomingCallOverlay.style.display = 'none';
+        
+        // Mở cửa sổ meeting với trạng thái mặc định
+        ipcRenderer.send('open-meeting-window', {
+            micEnabled: true,
+            cameraEnabled: true,
+            targetCode: callerCode
+        });
+
+        // Bắt đầu cuộc gọi
+        if (webrtcHandler) {
+            console.log('Chấp nhận cuộc gọi từ:', callerCode);
+            webrtcHandler.startCall(callerCode);
+        } else {
+            console.error('WebRTC handler chưa được khởi tạo');
+        }
+    };
+
+    // Xử lý nút từ chối cuộc gọi
+    rejectCallButton.onclick = () => {
+        incomingCallPopup.style.display = 'none';
+        incomingCallOverlay.style.display = 'none';
+        
+        // Gửi tín hiệu từ chối cuộc gọi
+        if (webrtcHandler) {
+            webrtcHandler.sendToSignalingServer({
+                type: 'call-reject',
+                target: callerCode
+            });
+        }
+    };
 }

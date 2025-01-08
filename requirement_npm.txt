@@ -1,1 +1,11 @@
-electronip
+electron
+ip
+
+express
+socket.io
+mongoose
+dotenv
+bcryptjs
+jsonwebtoken 
+uuid
+ws

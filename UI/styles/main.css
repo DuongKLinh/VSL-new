@@ -290,3 +290,46 @@ body {
     85% { opacity: 1; transform: translate(-50%, 0); }
     100% { opacity: 0; transform: translate(-50%, -20px); }
 }
+
+/* Popup cuộc gọi đến */
+#incoming-call-popup {
+    max-width: 400px;
+    text-align: center;
+}
+
+#incoming-call-popup h3 {
+    margin-bottom: 15px;
+    color: white;
+}
+
+#incoming-call-popup p {
+    margin-bottom: 20px;
+    color: #dcddde;
+}
+
+#caller-id {
+    font-weight: bold;
+    color: #5865f2;
+}
+
+.popup-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+#accept-call {
+    background-color: #3ba55c;
+}
+
+#accept-call:hover {
+    background-color: #2d7d46;
+}
+
+#reject-call {
+    background-color: #d83c3e;
+}
+
+#reject-call:hover {
+    background-color: #a12d2f;
+}
