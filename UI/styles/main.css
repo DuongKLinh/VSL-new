@@ -108,12 +108,17 @@ body {
     border: 2px solid #000000;
     border-radius: 4px;
     font-size: 16px;
+    font-weight: bold;
     cursor: pointer;
     transition: background-color 0.2s;
 }
 
 .create-call-button:hover {
-    background-color: #333333;
+    background-color: #e9e9e9;
+}
+
+.create-call-button:active {
+    background-color: #dddddd;
 }
 
 /* Popup */
@@ -123,13 +128,14 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: #202225;
+    background: #ffffff;
     padding: 20px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     z-index: 10;
-    color: white;
+    color: rgb(0, 0, 0);
     width: 300px;
+    border: 2px solid #36393f;
 }
 
 .popup input {
@@ -137,20 +143,85 @@ body {
     box-sizing: border-box;
     padding: 10px;
     margin-bottom: 10px;
-    border: none;
+    border: 2px solid #36393f;
     border-radius: 5px;
-    background-color: #36393f;
-    color: white;
+    background-color: #ffffff;
+    color: rgb(0, 0, 0);
+}
+
+.popup h3 {
+    margin-bottom: 20px;
+    color: rgb(0, 0, 0);
+    font-size: 18px;
+    text-align: center;
+}
+
+.popup p {
+    margin-bottom: 20px;
+    color: rgb(0, 0, 0);
 }
 
 .popup button {
     width: 100%;
-    background-color: #5865f2; /* Màu xanh Discord */
-    color: white;
-    border: none;
+    background-color: #ffffff;
+    color: rgb(0, 0, 0);
+    font-size: 16px;
+    border: 2px solid #36393f;
     padding: 10px;
     border-radius: 5px;
     cursor: pointer;
+}
+
+#logout-ok {
+    background-color: #e64447;
+    color: white;
+    border: 2px solid #36393f;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#logout-ok:hover {
+    background-color: #ff4b4e;
+}
+
+#logout-ok:active {
+    background-color: #b54141;
+}
+
+.meeting-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.control-btn {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 50%;
+    background-color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    border: 2px solid #36393f;
+}
+
+#meeting-ok {
+    background-color: #51c423;
+    color: white;
+}
+
+#meeting-ok:hover {
+    background-color: #63db33;
+}
+
+#meeting-ok:active {
+    background-color: #4ab421;
 }
 
 .control-btn img {
@@ -159,7 +230,7 @@ body {
 }
 
 .popup button:hover {
-    background-color: #4752c4; /* Màu hover */
+    background-color: #e9e9e9; /* Màu hover */
 }
 
 .overlay {

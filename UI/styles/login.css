@@ -7,23 +7,23 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #2f3136; /* Nền xám đậm của Discord */
-    color: white;
+    background-color: white; /* Nền xám đậm của Discord */
 }
 
 /* Form đăng nhập */
 .login-container {
-    background-color: #202225; /* Nền form */
+    background-color: #e9e9e9; /* Nền form */
     padding: 40px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     width: 300px;
     text-align: center;
+    border: 2px solid #36393f;
 }
 
 .login-container h1 {
     margin-bottom: 20px;
-    color: white;
+    color: black;
 }
 
 .login-container input {
@@ -31,24 +31,30 @@ body {
     box-sizing: border-box;
     padding: 10px;
     margin-bottom: 15px;
-    border: none;
+    border: 2px solid #36393f;
     border-radius: 5px;
-    background-color: #36393f;
-    color: white;
+    background-color: #ffffff;
+    color: rgb(0, 0, 0);
+    font-size: 16px;
 }
 
 .login-container button {
     width: 100%;
     box-sizing: border-box;
-    background-color: #5865f2;
-    color: white;
-    border: none;
+    background-color: #ffffff;
+    color: rgb(0, 0, 0);
+    border: 2px solid #36393f;
     padding: 10px;
     border-radius: 5px;
     cursor: pointer;
     font-size: 16px;
+    font-weight: bold;
 }
 
 .login-container button:hover {
-    background-color: #4752c4; /* Màu hover */
+    background-color: #e9e9e9; /* Màu hover */
+}
+
+.login-container button:active {
+    background-color: #dddddd; /* Màu hover */
 }

@@ -36,6 +36,9 @@ const remoteParticipant = document.createElement('div');
 remoteParticipant.className = 'participant';
 const remoteUserName = document.createElement('p');
 remoteUserName.textContent = 'Người dùng khác';
+// Thêm lớp CSS mới
+remoteUserName.classList.add('remote-username');
+
 remoteParticipant.appendChild(remoteVideo);
 remoteParticipant.appendChild(remoteUserName);
 participantsContainer.appendChild(remoteParticipant);
