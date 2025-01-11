@@ -36,7 +36,7 @@ with open('./Backend/dataset/labels.json', 'r', encoding='utf-8') as file:
     labels_json = json.load(file)
 
 num_classes = len(labels_json)
-model_path = './preparation/results_1/best.keras'
+model_path = './preparation/results/best.keras'
 cnn_lstm_model = CNNLSTMModel(input_shape=(60, 84), num_classes=num_classes)
 cnn_lstm_model.load_model_from_file(model_path)
 video_processor = VideoProcessor()
