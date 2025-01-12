@@ -136,6 +136,8 @@ async function initializeWebRTC() {
             }
         }
 
+        setupVideoFrameCapture();
+
     } catch (error) {
         console.error('Lỗi khởi tạo media:', error);
         handleMediaError(error);
@@ -170,54 +172,46 @@ function initializeWebRTCHandlers() {
 
 // Thiết lập capture video frames để nhận dạng
 function setupVideoFrameCapture() {
+    console.log('Setting up video capture...');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     
     function processFrame() {
-        if (!isTranslating || !localVideo.srcObject) return;
+        if (!isTranslating || !localVideo.srcObject) {
+            console.log('Skipping frame processing - translation disabled or no video');
+            return;
+        }
 
         canvas.width = localVideo.videoWidth;
         canvas.height = localVideo.videoHeight;
         context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
         
-        // Thêm frame mới vào buffer
         frameBuffer.push(canvas.toDataURL('image/jpeg', 0.8));
         if (frameBuffer.length > FRAMES_TO_KEEP) {
             frameBuffer.shift();
         }
 
         frameCounter++;
+        console.log(`Frame processed: ${frameCounter}/${FRAMES_PER_SEND}, Buffer size: ${frameBuffer.length}/${FRAMES_TO_KEEP}`);
         
-        // Gửi frames khi đủ điều kiện
         if (frameCounter >= FRAMES_PER_SEND && frameBuffer.length >= FRAMES_TO_KEEP) {
+            console.log('Sending frames batch to server...');
             sendFramesToServer([...frameBuffer]);
             frameCounter = 0;
         }
-    }
 
-    // Tạo animation loop
-    function animate() {
         if (isTranslating) {
-            processFrame();
-            requestAnimationFrame(animate);
+            requestAnimationFrame(processFrame);
         }
     }
 
-    // Bắt đầu xử lý khi bật dịch
-    translationButton.addEventListener('click', () => {
-        isTranslating = !isTranslating;
-        if (isTranslating) {
-            frameBuffer = [];
-            frameCounter = 0;
-            animate();
-        }
-        translationButton.querySelector('img').style.opacity = isTranslating ? 1 : 0.5;
-    });
+    processFrame();
 }
 
 // Gửi frames đến server để xử lý
 async function sendFramesToServer(frames) {
     try {
+        console.log('Gửi frames...');
         const response = await fetch('http://192.168.1.8:8000/api/process-frames', {
             method: 'POST',
             headers: {
@@ -234,19 +228,9 @@ async function sendFramesToServer(frames) {
         console.log('Gửi frames thành công');
         const data = await response.json();
         console.log('Dữ liệu trả về:', data);
-        if (data.label !== undefined) {
-            console.log('Label:', data.label);
-            updateTranslationOverlay(data.label);
+        if (data.label) {  // Đã thay đổi điều kiện kiểm tra
             console.log('Nhãn:', data.label);
-            if (webrtcHandler) {
-                console.log('Gửi kết quả dịch:', data.label);
-                webrtcHandler.sendMessage({
-                    type: 'translation-result',
-                    label: data.label
-                });
-                console.log('Đã gửi kết quả dịch');
-            }
-            console.log('Đã cập nhật overlay');
+            updateTranslationOverlay(data.label);
         }
     } catch (error) {
         console.error('Lỗi gửi frames:', error);
@@ -262,17 +246,7 @@ function updateTranslationOverlay(label) {
         remoteParticipant.appendChild(overlay);
     }
     
-    // Lấy nhãn từ labels.json
-    fetch('/Backend/dataset/labels.json')
-        .then(response => response.json())
-        .then(labels => {
-            const labelText = Object.values(labels).find(l => l.index === label)?.label_with_diacritics || 'Không xác định';
-            overlay.textContent = `Đang nói: ${labelText}`;
-        })
-        .catch(error => {
-            console.error('Lỗi đọc labels:', error);
-            overlay.textContent = `Đang nói: Không xác định`;
-        });
+    overlay.textContent = `Đang nói: ${label}`;
 }
 
 // Xử lý các nút điều khiển
@@ -298,15 +272,27 @@ cameraButton.addEventListener('click', () => {
     }
 });
 
-translationButton.addEventListener('click', () => {
-    isTranslationEnabled = !isTranslationEnabled;
-    translationButton.querySelector('img').style.opacity = isTranslationEnabled ? 1 : 0.5;
-    
-    if (!isTranslationEnabled) {
-        const overlay = document.querySelector('.translation-overlay');
-        if (overlay) overlay.remove();
-    }
-});
+if (translationButton) {
+    translationButton.addEventListener('click', () => {
+        isTranslating = !isTranslating;
+        console.log('Translation state changed:', isTranslating);
+        
+        if (isTranslating) {
+            console.log('Starting translation...');
+            frameBuffer = [];
+            frameCounter = 0;
+            setupVideoFrameCapture();
+        } else {
+            console.log('Stopping translation...');
+            const overlay = document.querySelector('.translation-overlay');
+            if (overlay) overlay.remove();
+        }
+        
+        translationButton.querySelector('img').style.opacity = isTranslating ? 1 : 0.5;
+    });
+} else {
+    console.error('Translation button not found!');
+}
 
 // Xử lý rời phòng họp
 leaveButton.addEventListener('click', () => {

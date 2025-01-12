@@ -78,9 +78,14 @@ async def process_frames(request: VideoFramesRequest):
         
         predicted_index = sign_recognition.predict(data_X)
         
-        print(get_label_by_index(predicted_index))
+        # Lấy nhãn tương ứng với index
+        predicted_label = get_label_by_index(predicted_index)
+        print(f"Predicted label: {predicted_label}")
 
-        return {"status": "success", "label": predicted_index.item()}
+        return {
+            "status": "success", 
+            "label": predicted_label  # Trả về tên nhãn thay vì index
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"{e}")
 

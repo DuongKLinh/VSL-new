@@ -298,10 +298,21 @@ class WebRTCHandler {
         try {
             console.log('Received answer from:', message.from);
             const { answer } = message;
+    
+            if (!answer || !answer.type) {
+                console.error('Invalid answer received:', answer);
+                return;
+            }
+    
             if (this.peerConnection) {
                 const remoteDesc = new RTCSessionDescription(answer);
                 await this.peerConnection.setRemoteDescription(remoteDesc);
                 console.log('Set remote description (answer)');
+                
+                // Xử lý các ICE candidates đã được buffer
+                await this.processPendingIceCandidates();
+            } else {
+                console.error('No peer connection available');
             }
         } catch (error) {
             console.error('Error in handleCallAnswer:', error);
@@ -336,6 +347,16 @@ class WebRTCHandler {
         try {
             const { candidate } = message;
             if (this.peerConnection && candidate) {
+                // Đợi cho đến khi remote description được set
+                if (this.peerConnection.remoteDescription === null) {
+                    console.log('Buffering ICE candidate vì remote description chưa sẵn sàng');
+                    if (!this.iceCandidatesBuffer) {
+                        this.iceCandidatesBuffer = [];
+                    }
+                    this.iceCandidatesBuffer.push(candidate);
+                    return;
+                }
+    
                 console.log('Adding received ICE candidate');
                 await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
                 console.log('Successfully added ICE candidate');
@@ -348,6 +369,22 @@ class WebRTCHandler {
         }
     }
     
+    // Hàm xử lý các candidate đã được buffer
+    async processPendingIceCandidates() {
+        if (this.iceCandidatesBuffer && this.iceCandidatesBuffer.length > 0) {
+            console.log('Processing pending ICE candidates:', this.iceCandidatesBuffer.length);
+            while (this.iceCandidatesBuffer.length) {
+                const candidate = this.iceCandidatesBuffer.shift();
+                try {
+                    await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log('Added buffered ICE candidate');
+                } catch (error) {
+                    console.error('Error adding buffered ICE candidate:', error);
+                }
+            }
+        }
+    }
+
     sendToSignalingServer(message) {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify(message));
