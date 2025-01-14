@@ -53,7 +53,7 @@ const WebRTCHandler = require('../scripts/webrtc_handler');
 
 let frameBuffer = [];
 const FRAMES_TO_KEEP = 60;  // Số frame giữ lại
-const FRAMES_PER_SEND = 10; // Số frame mới trước khi gửi
+const FRAME_INTERVAL = 10; // Số frame mới trước khi gửi
 let frameCounter = 0;
 let isTranslating = false;
 let mediaRecorder = null;
@@ -175,34 +175,37 @@ function setupVideoFrameCapture() {
     console.log('Setting up video capture...');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    let skipFrameCount = 0;
     
     function processFrame() {
         if (!isTranslating || !localVideo.srcObject) {
-            console.log('Skipping frame processing - translation disabled or no video');
+            requestAnimationFrame(processFrame);
             return;
         }
 
-        canvas.width = localVideo.videoWidth;
-        canvas.height = localVideo.videoHeight;
-        context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+        skipFrameCount++;
         
-        frameBuffer.push(canvas.toDataURL('image/jpeg', 0.8));
-        if (frameBuffer.length > FRAMES_TO_KEEP) {
-            frameBuffer.shift();
+        // Chỉ xử lý frame khi đạt đến khoảng cách frame_interval
+        if (skipFrameCount >= FRAME_INTERVAL) {
+            canvas.width = localVideo.videoWidth;
+            canvas.height = localVideo.videoHeight;
+            context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+            
+            frameBuffer.push(canvas.toDataURL('image/jpeg', 0.8));
+            console.log(`Captured frame ${frameBuffer.length}/${FRAMES_TO_KEEP}`);
+            
+            // Reset bộ đếm frame
+            skipFrameCount = 0;
+            
+            // Khi đủ số frame cần thiết, gửi đến server
+            if (frameBuffer.length >= FRAMES_TO_KEEP) {
+                console.log('Sending frames batch to server...');
+                sendFramesToServer([...frameBuffer]);
+                frameBuffer = []; // Xóa buffer sau khi gửi
+            }
         }
 
-        frameCounter++;
-        console.log(`Frame processed: ${frameCounter}/${FRAMES_PER_SEND}, Buffer size: ${frameBuffer.length}/${FRAMES_TO_KEEP}`);
-        
-        if (frameCounter >= FRAMES_PER_SEND && frameBuffer.length >= FRAMES_TO_KEEP) {
-            console.log('Sending frames batch to server...');
-            sendFramesToServer([...frameBuffer]);
-            frameCounter = 0;
-        }
-
-        if (isTranslating) {
-            requestAnimationFrame(processFrame);
-        }
+        requestAnimationFrame(processFrame);
     }
 
     processFrame();
@@ -220,16 +223,13 @@ async function sendFramesToServer(frames) {
             body: JSON.stringify({ frames: frames })
         });
 
-        console.log('Gửi frames:', response);
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        console.log('Gửi frames thành công');
+
         const data = await response.json();
-        console.log('Dữ liệu trả về:', data);
-        if (data.label) {  // Đã thay đổi điều kiện kiểm tra
-            console.log('Nhãn:', data.label);
+        if (data.label) {
+            console.log('Nhãn nhận được:', data.label);
             updateTranslationOverlay(data.label);
         }
     } catch (error) {

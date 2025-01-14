@@ -66,6 +66,30 @@ def extract_frames_from_base64s(data):
         frames.append(frame)
     return frames
 
+def save_frames_to_folder(frames, predicted_label):
+    # Tạo tên folder theo định dạng yyyy-mm-dd_hhmmss
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    folder_name = f"saved_frames/{timestamp}_{predicted_label}"
+    
+    # Tạo folder nếu chưa tồn tại
+    os.makedirs(folder_name, exist_ok=True)
+    
+    for idx, frame_base64 in enumerate(frames):
+        # Bỏ phần header của base64 string nếu có
+        if "base64," in frame_base64:
+            frame_base64 = frame_base64.split("base64,")[1]
+            
+        # Decode base64 thành image
+        img_data = base64.b64decode(frame_base64)
+        nparr = np.frombuffer(img_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # Lưu frame
+        frame_path = os.path.join(folder_name, f"frame_{idx:03d}.jpg")
+        cv2.imwrite(frame_path, frame)
+    
+    return folder_name
+
 @app.post("/api/process-frames")
 async def process_frames(request: VideoFramesRequest):
     try:
@@ -78,14 +102,14 @@ async def process_frames(request: VideoFramesRequest):
         
         predicted_index = sign_recognition.predict(data_X)
         
-        # Lấy nhãn tương ứng với index
-        predicted_label = get_label_by_index(predicted_index)
-        print(f"Predicted label: {predicted_label}")
+        # Lấy label text thay vì trả về index
+        label = get_label_by_index(predicted_index)
+        folder_path = save_frames_to_folder(request.frames, label)
+        print(f"Đã lưu frames vào folder: {folder_path}")
+        print(f"Nhãn dự đoán: {label}")
 
-        return {
-            "status": "success", 
-            "label": predicted_label  # Trả về tên nhãn thay vì index
-        }
+        # Trả về label text thay vì index
+        return {"status": "success", "label": label}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"{e}")
 

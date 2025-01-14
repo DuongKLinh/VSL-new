@@ -74,11 +74,19 @@ class DataProcessor:
     
 if __name__ == "__main__":
     # Example usage:
+    # data_processor = DataProcessor(
+    #     data_folder="../dataset/data",
+    #     labels_file="../dataset/labels.json",
+    #     output_x_file="../dataset/data_X.npy",
+    #     output_y_file="../dataset/data_Y.npy"
+    # )
+    # data_processor.process_videos()
+    
     data_processor = DataProcessor(
-        data_folder="../dataset/data",
+        data_folder="D:/Final_Project/VSL-Translator-Duong/augmented_data",
         labels_file="../dataset/labels.json",
-        output_x_file="../dataset/data_X.npy",
-        output_y_file="../dataset/data_Y.npy"
+        output_x_file="D:/Final_Project/VSL-Translator-Duong/data_X.npy",
+        output_y_file="D:/Final_Project/VSL-Translator-Duong/data_Y.npy"
     )
     data_processor.process_videos()
 
