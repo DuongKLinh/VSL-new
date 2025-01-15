@@ -307,13 +307,15 @@ if (translationButton) {
             frameBuffer = [];
             frameCounter = 0;
             setupVideoFrameCapture();
+            translationButton.classList.add('translation-active');
+            translationButton.querySelector('img').src = '../assets/sign-language-on.png';
         } else {
             console.log('Stopping translation...');
             const overlay = document.querySelector('.translation-overlay');
             if (overlay) overlay.remove();
+            translationButton.classList.remove('translation-active');
+            translationButton.querySelector('img').src = '../assets/sign-language-off.png';
         }
-        
-        translationButton.querySelector('img').style.opacity = isTranslating ? 1 : 0.5;
     });
 } else {
     console.error('Translation button not found!');
