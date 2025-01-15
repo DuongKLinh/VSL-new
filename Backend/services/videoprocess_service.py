@@ -39,14 +39,14 @@ def export_frames_with_coordinates(frames, coordinates, output_folder, prefix="f
 
 class VideoProcessor:
     def __init__(self, frame_size=60):
-        """
-        Initializes the VideoProcessor class.
-
-        :param video_path: Path to the video file.
-        :param frame_size: Number of frames to extract from the video (default 60).
-        """
         self.frame_size = frame_size
-        self.mp_hands = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=2)
+        self.mp_hands = mp.solutions.hands.Hands(
+            static_image_mode=True,
+            max_num_hands=2,
+            min_detection_confidence=0.5
+        )
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.mp_drawing_styles = mp.solutions.drawing_styles
 
     def process_video_from_path(self, video_path):
         """
@@ -62,11 +62,20 @@ class VideoProcessor:
         return data_X, frames
     
     def process_video_from_frames(self, frames):
-        data_X = [self._extract_hand_coordinates(frame) for frame in frames]
-
-        export_frames_with_coordinates(frames, data_X, output_folder="output", prefix="frame")
-
-        return data_X, frames
+        data_X = []
+        valid_frames = []
+        
+        for frame in frames:
+            coordinates = self._extract_hand_coordinates(frame)
+            if coordinates:  # Chỉ thêm frame và tọa độ khi phát hiện được bàn tay
+                data_X.append(coordinates)
+                valid_frames.append(frame)
+        
+        # Chỉ export frames khi có ít nhất một frame hợp lệ
+        if valid_frames:
+            export_frames_with_coordinates(valid_frames, data_X, output_folder="output", prefix="frame")
+            
+        return data_X, valid_frames
 
     def _extract_frames_from_path(self, video_path, num_frames):
         """
@@ -99,28 +108,37 @@ class VideoProcessor:
 
     def _extract_hand_coordinates(self, frame):
         """
-        Extract hand landmarks from a frame using MediaPipe. If hands are not detected, 
-        return a list of [-1, -1] for each landmark.
-
-        :param frame: The video frame to process.
-        :return: A list of hand landmarks coordinates (x, y).
+        Extract hand landmarks from a frame using MediaPipe. If hands are not detected,
+        return None instead of default coordinates.
         """
         if frame is None:
-            return [[-1, -1]] * 42  # 21 points per hand, 2 hands, default to [-1, -1] for missing landmarks
+            return None
 
         results = self.mp_hands.process(frame)
         coordinates = []
-
+        
+        # Vẽ xương bàn tay nếu phát hiện được
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
+                # Vẽ các điểm mốc và kết nối
+                self.mp_drawing.draw_landmarks(
+                    frame,
+                    hand_landmarks,
+                    mp.solutions.hands.HAND_CONNECTIONS,
+                    self.mp_drawing_styles.get_default_hand_landmarks_style(),
+                    self.mp_drawing_styles.get_default_hand_connections_style()
+                )
+                
+                # Thu thập tọa độ
                 for lm in hand_landmarks.landmark:
                     coordinates.append([lm.x, lm.y])
 
-        # If there are fewer than 42 landmarks (i.e., no hands detected), fill with [-1, -1]
-        while len(coordinates) < 42:
-            coordinates.append([-1, -1])
+            # Chỉ trả về tọa độ khi phát hiện được bàn tay
+            while len(coordinates) < 42:  # Đảm bảo đủ 42 điểm cho 2 bàn tay
+                coordinates.append([-1, -1])
+            return coordinates
             
-        return coordinates
+        return None  # Trả về None nếu không phát hiện bàn tay
 
 if __name__ == "__main__":
     video_path = '../test.mp4'

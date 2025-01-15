@@ -10,10 +10,14 @@
     <div class="meeting-container">
         <button id="leave-meeting" class="btn-danger">Leave</button>
         
-        <div class="participants-container">
+        <div class="participants-container"> 
             <div id="self" class="participant">
-                <video id="self-video" autoplay muted></video>
+                <div class="video-container">
+                    <video id="self-video" autoplay muted></video>
+                    <canvas id="self-canvas"></canvas>
+                </div>
                 <p>You</p>
+                <div class="prediction-label" id="self-prediction">Đang chờ...</div>
             </div>
         </div>
     

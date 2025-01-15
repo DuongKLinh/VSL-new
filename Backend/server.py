@@ -93,23 +93,31 @@ def save_frames_to_folder(frames, predicted_label):
 @app.post("/api/process-frames")
 async def process_frames(request: VideoFramesRequest):
     try:
-        frames = []
-        predicted_index = 0
         frames = extract_frames_from_base64s(request)
         
-        data_X, _ = video_processor.process_video_from_frames(frames)
-        sign_recognition = SignRecognition(cnn_lstm_model)
+        # Xử lý frames để lấy tọa độ và vẽ xương bàn tay
+        data_X, processed_frames = video_processor.process_video_from_frames(frames)
         
+        # Kiểm tra xem có dữ liệu hợp lệ không
+        if not data_X or len(data_X) == 0:
+            return {"status": "no_hand_detected", "label": None}
+            
+        # Thực hiện dự đoán
         predicted_index = sign_recognition.predict(data_X)
         
-        # Lấy label text thay vì trả về index
+        if predicted_index is None:
+            return {"status": "insufficient_data", "label": None}
+            
+        # Lấy label text
         label = get_label_by_index(predicted_index)
+        
+        # Lưu frames đã xử lý
         folder_path = save_frames_to_folder(request.frames, label)
         print(f"Đã lưu frames vào folder: {folder_path}")
         print(f"Nhãn dự đoán: {label}")
 
-        # Trả về label text thay vì index
         return {"status": "success", "label": label}
+        
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"{e}")
 

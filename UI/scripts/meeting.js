@@ -25,6 +25,7 @@ const okLeaveButton = document.getElementById('leave-meeting-ok');
 const leavePopup = document.getElementById('leave-meeting-popup');
 const leaveOverlay = document.getElementById('leave-meeting-overlay');
 const cancelLeaveButton = document.getElementById('leave-meeting-cancel');
+const selfPredictionLabel = document.getElementById('self-prediction');
 
 // Tạo video element cho người kia
 const remoteVideo = document.createElement('video');
@@ -228,13 +229,37 @@ async function sendFramesToServer(frames) {
         }
 
         const data = await response.json();
-        if (data.label) {
-            console.log('Nhãn nhận được:', data.label);
-            updateTranslationOverlay(data.label);
-        }
+        console.log('Kết quả từ server:', data);
+        
+        // Cập nhật nhãn dựa trên kết quả từ server
+        updatePredictionLabel(data);
     } catch (error) {
         console.error('Lỗi gửi frames:', error);
     }
+}
+
+// Hàm cập nhật nhãn
+function updatePredictionLabel(data) {
+    if (!selfPredictionLabel) return;
+
+    let labelText = 'Đang chờ...';
+    
+    if (data.status === 'no_hand_detected') {
+        labelText = 'Không phát hiện bàn tay';
+    } else if (data.status === 'insufficient_data') {
+        labelText = 'Chưa đủ dữ liệu';
+    } else if (data.status === 'success' && data.label) {
+        labelText = `Đang nói: ${data.label}`;
+    }
+
+    // Cập nhật text và thêm animation
+    selfPredictionLabel.textContent = labelText;
+    selfPredictionLabel.classList.add('updated');
+    
+    // Xóa class animation sau khi hoàn thành
+    setTimeout(() => {
+        selfPredictionLabel.classList.remove('updated');
+    }, 300);
 }
 
 // Cập nhật kết quả dịch

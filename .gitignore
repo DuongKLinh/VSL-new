@@ -168,5 +168,11 @@ backend/models/*
 
 # src/preparation/check.py
 app_require.txt
-Backend/dataset/data/*
+# Backend/dataset/data/*
+
 Backend/preparation/results/*
+Backend/results/*
+augmented_data
+Backend/dataset
+output
+saved_frames
