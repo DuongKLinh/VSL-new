@@ -41,9 +41,11 @@ class VideoProcessor:
     def __init__(self, frame_size=60):
         self.frame_size = frame_size
         self.mp_hands = mp.solutions.hands.Hands(
-            static_image_mode=True,
+            static_image_mode=False,
             max_num_hands=2,
-            min_detection_confidence=0.5
+            min_detection_confidence=0.3,  # Giảm xuống để tăng độ nhạy
+            min_tracking_confidence=0.3,    # Thêm tham số này
+            model_complexity=0  # Thêm model_complexity=0 để tăng tốc độ xử lý
         )
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_drawing_styles = mp.solutions.drawing_styles
@@ -64,18 +66,24 @@ class VideoProcessor:
     def process_video_from_frames(self, frames):
         data_X = []
         valid_frames = []
+        frames_with_hands = 0
+        
+        print(f"Bắt đầu xử lý {len(frames)} frames...")
         
         for frame in frames:
             coordinates = self._extract_hand_coordinates(frame)
-            if coordinates:  # Chỉ thêm frame và tọa độ khi phát hiện được bàn tay
-                data_X.append(coordinates)
-                valid_frames.append(frame)
-        
-        # Chỉ export frames khi có ít nhất một frame hợp lệ
-        if valid_frames:
-            export_frames_with_coordinates(valid_frames, data_X, output_folder="output", prefix="frame")
+            # Kiểm tra xem frame có bàn tay không bằng cách tìm tọa độ khác [-1, -1]
+            has_hand = any(coord != [-1, -1] for coord in coordinates)
             
-        return data_X, valid_frames
+            if has_hand:
+                frames_with_hands += 1
+                
+            data_X.append(coordinates)
+            valid_frames.append(frame)
+                
+        print(f"Phát hiện được bàn tay trong {frames_with_hands}/{len(frames)} frames")
+                
+        return data_X, valid_frames, frames_with_hands
 
     def _extract_frames_from_path(self, video_path, num_frames):
         """
@@ -109,10 +117,10 @@ class VideoProcessor:
     def _extract_hand_coordinates(self, frame):
         """
         Extract hand landmarks from a frame using MediaPipe. If hands are not detected,
-        return None instead of default coordinates.
+        return default coordinates instead of None.
         """
         if frame is None:
-            return None
+            return [[-1, -1]] * 42  # Default coordinates for no hand
 
         results = self.mp_hands.process(frame)
         coordinates = []
@@ -133,12 +141,11 @@ class VideoProcessor:
                 for lm in hand_landmarks.landmark:
                     coordinates.append([lm.x, lm.y])
 
-            # Chỉ trả về tọa độ khi phát hiện được bàn tay
-            while len(coordinates) < 42:  # Đảm bảo đủ 42 điểm cho 2 bàn tay
-                coordinates.append([-1, -1])
-            return coordinates
+        # Điền thêm tọa độ mặc định nếu thiếu
+        while len(coordinates) < 42:  # Đảm bảo đủ 42 điểm cho 2 bàn tay
+            coordinates.append([-1, -1])
             
-        return None  # Trả về None nếu không phát hiện bàn tay
+        return coordinates  # Luôn trả về tọa độ, dù có bàn tay hay không
 
 if __name__ == "__main__":
     video_path = '../test.mp4'

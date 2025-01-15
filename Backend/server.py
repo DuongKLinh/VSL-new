@@ -94,32 +94,37 @@ def save_frames_to_folder(frames, predicted_label):
 async def process_frames(request: VideoFramesRequest):
     try:
         frames = extract_frames_from_base64s(request)
+        data_X, processed_frames, frames_with_hands = video_processor.process_video_from_frames(frames)
         
-        # Xử lý frames để lấy tọa độ và vẽ xương bàn tay
-        data_X, processed_frames = video_processor.process_video_from_frames(frames)
-        
-        # Kiểm tra xem có dữ liệu hợp lệ không
-        if not data_X or len(data_X) == 0:
+        # Kiểm tra xem có frame nào có bàn tay không
+        if frames_with_hands == 0:
+            print("Không phát hiện bàn tay trong frames")
             return {"status": "no_hand_detected", "label": None}
+            
+        # Kiểm tra xem có đủ số frame không
+        if len(data_X) < 60:
+            print(f"Chưa đủ frames: {len(data_X)}/60")
+            return {"status": "insufficient_data", "label": None}
             
         # Thực hiện dự đoán
         predicted_index = sign_recognition.predict(data_X)
         
         if predicted_index is None:
-            return {"status": "insufficient_data", "label": None}
+            return {"status": "prediction_failed", "label": None}
             
         # Lấy label text
         label = get_label_by_index(predicted_index)
-        
-        # Lưu frames đã xử lý
-        folder_path = save_frames_to_folder(request.frames, label)
-        print(f"Đã lưu frames vào folder: {folder_path}")
-        print(f"Nhãn dự đoán: {label}")
+        print(f"Dự đoán thành công: {label} (có {frames_with_hands}/60 frames chứa bàn tay)")
 
-        return {"status": "success", "label": label}
+        return {
+            "status": "success", 
+            "label": label,
+            "frames_with_hands": frames_with_hands
+        }
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"{e}")
+        print(f"Lỗi xử lý frames: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"{str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
