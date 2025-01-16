@@ -81,7 +81,7 @@ class VSLTranslator:
             print("Khởi động Signaling Server...")
             uvicorn.run(
                 signaling_app, 
-                host="192.168.1.8", 
+                host="0.0.0.0", 
                 port=8765,
                 ws="websockets",  # Chỉ định rõ websocket backend
                 loop="asyncio"    # Sử dụng asyncio event loop
