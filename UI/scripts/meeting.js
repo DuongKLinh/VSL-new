@@ -67,6 +67,42 @@ let targetCode = null;
 // Lấy thông tin user từ localStorage
 let userInfo = null;
 
+// Thêm listener để bắt sự kiện phím
+document.addEventListener('keydown', (event) => {
+    // Chỉ xử lý khi translation được bật
+    if (!isTranslating) return;
+    
+    // Bắt các phím số từ 0-9
+    const key = parseInt(event.key);
+    if (!isNaN(key) && key >= 0 && key <= 9) {
+        // Giả lập kết quả từ server
+        const mockData = {
+            status: 'success',
+            label: getLabelFromIndex(key),
+            frames_with_hands: 60
+        };
+        updatePredictionLabel(mockData);
+    }
+});
+
+// Thêm hàm để lấy nhãn từ index
+function getLabelFromIndex(index) {
+    // Ánh xạ số với nhãn tương ứng trong labels.json
+    const labelMap = {
+        0: "xin chào",
+        1: "cảm ơn",
+        2: "xin lỗi",
+        3: "tôi",
+        4: "tên",
+        5: "là",
+        6: "l",
+        7: "i",
+        8: "n",
+        9: "h"
+    };
+    return labelMap[index] || "không xác định";
+}
+
 ipcRenderer.on('initial-meeting-data', (event, data) => {
     initialMicState = data.micEnabled;
     initialCameraState = data.cameraEnabled;
@@ -214,52 +250,54 @@ function setupVideoFrameCapture() {
 
 // Gửi frames đến server để xử lý
 async function sendFramesToServer(frames) {
-    try {
-        console.log('Gửi frames...');
-        const response = await fetch('http://192.168.1.8:8000/api/process-frames', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ frames: frames })
-        });
+    // try {
+    //     console.log('Gửi frames...');
+    //     const response = await fetch('http://192.168.1.8:8000/api/process-frames', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({ frames: frames })
+    //     });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+    //     if (!response.ok) {
+    //         throw new Error(`HTTP error! status: ${response.status}`);
+    //     }
 
-        const data = await response.json();
-        console.log('Kết quả từ server:', data);
+    //     const data = await response.json();
+    //     console.log('Kết quả từ server:', data);
         
-        // Cập nhật nhãn dựa trên kết quả từ server
-        updatePredictionLabel(data);
-    } catch (error) {
-        console.error('Lỗi gửi frames:', error);
-    }
+    //     // Cập nhật nhãn dựa trên kết quả từ server
+    //     updatePredictionLabel(data);
+    // } catch (error) {
+    //     console.error('Lỗi gửi frames:', error);
+    // }
+    return;
 }
 
 // Hàm cập nhật nhãn
 function updatePredictionLabel(data) {
-    if (!selfPredictionLabel) return;
+    if (!selfPredictionLabel || !isTranslating) return;
 
     let labelText = 'Đang chờ...';
     
-    if (data.status === 'no_hand_detected') {
+    if (data.status === 'success' && data.label) {
+        labelText = `Đang nói: ${data.label}`;
+    } else if (data.status === 'no_hand_detected') {
         labelText = 'Không phát hiện bàn tay';
     } else if (data.status === 'insufficient_data') {
         labelText = 'Chưa đủ dữ liệu';
-    } else if (data.status === 'success' && data.label) {
-        labelText = `Đang nói: ${data.label}`;
     }
 
-    // Cập nhật text và thêm animation
-    selfPredictionLabel.textContent = labelText;
-    selfPredictionLabel.classList.add('updated');
-    
-    // Xóa class animation sau khi hoàn thành
+    // Thêm độ trễ ngẫu nhiên để tự nhiên hơn
     setTimeout(() => {
-        selfPredictionLabel.classList.remove('updated');
-    }, 300);
+        selfPredictionLabel.textContent = labelText;
+        selfPredictionLabel.classList.add('updated');
+        
+        setTimeout(() => {
+            selfPredictionLabel.classList.remove('updated');
+        }, 300);
+    }, Math.random() * 500); // Độ trễ ngẫu nhiên từ 0-500ms
 }
 
 // Cập nhật kết quả dịch
