@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from signaling.socket_handler import WebSocketHandler
+from socket_handler import WebSocketHandler
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
