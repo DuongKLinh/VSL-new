@@ -265,28 +265,34 @@ class WebRTCHandler {
             }
     
             this.targetCode = from;
-            await this.createPeerConnection();
             
-            // Set remote description TRƯỚC
+            // Đóng kết nối cũ nếu có
+            if (this.peerConnection) {
+                await this.peerConnection.close();
+                this.peerConnection = null;
+            }
+            
+            await this.createPeerConnection();
+            console.log(this.peerConnection);
+            
             const remoteDesc = new RTCSessionDescription(offer);
             await this.peerConnection.setRemoteDescription(remoteDesc);
             console.log('Set remote description (offer)');
     
-            // Sau đó tạo và set local description
             const answer = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(answer);
             console.log('Set local description (answer)');
     
-            // Chờ ICE gathering hoàn tất
             await this.waitForIceGathering();
     
-            // Gửi answer
             this.sendToSignalingServer({
                 type: 'call-answer',
                 target: from,
                 answer: this.peerConnection.localDescription
             });
+            
             console.log('Answer created and sent');
+            
         } catch (error) {
             console.error('Error in handleCallOffer:', error);
             if (this.onError) {
@@ -305,16 +311,25 @@ class WebRTCHandler {
                 return;
             }
     
-            if (this.peerConnection) {
-                const remoteDesc = new RTCSessionDescription(answer);
-                await this.peerConnection.setRemoteDescription(remoteDesc);
-                console.log('Set remote description (answer)');
-                
-                // Xử lý các ICE candidates đã được buffer
-                await this.processPendingIceCandidates();
-            } else {
+            if (!this.peerConnection) {
                 console.error('No peer connection available');
+                return;
             }
+    
+            const currentState = this.peerConnection.signalingState;
+            console.log('Current signaling state:', currentState);
+    
+            if (currentState === "stable") {
+                console.warn('Connection already stable, ignoring answer');
+                return;
+            }
+    
+            const remoteDesc = new RTCSessionDescription(answer);
+            await this.peerConnection.setRemoteDescription(remoteDesc);
+            console.log('Set remote description (answer)');
+            
+            await this.processPendingIceCandidates();
+    
         } catch (error) {
             console.error('Error in handleCallAnswer:', error);
             if (this.onError) {
@@ -389,6 +404,7 @@ class WebRTCHandler {
     sendToSignalingServer(message) {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify(message));
+            console.log('WebSocket đã kết nối thành công');
         } else {
             console.error('WebSocket không ở trạng thái mở');
         }
