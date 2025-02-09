@@ -265,34 +265,25 @@ class WebRTCHandler {
             }
     
             this.targetCode = from;
-            
-            // Đóng kết nối cũ nếu có
-            if (this.peerConnection) {
-                await this.peerConnection.close();
-                this.peerConnection = null;
-            }
-            
             await this.createPeerConnection();
-            console.log(this.peerConnection);
-            
+    
+            // Set remote description FIRST
             const remoteDesc = new RTCSessionDescription(offer);
             await this.peerConnection.setRemoteDescription(remoteDesc);
             console.log('Set remote description (offer)');
     
+            // Then create and set local description
             const answer = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(answer);
             console.log('Set local description (answer)');
     
-            await this.waitForIceGathering();
-    
+            // Send answer only after both descriptions are set
             this.sendToSignalingServer({
                 type: 'call-answer',
                 target: from,
                 answer: this.peerConnection.localDescription
             });
-            
-            console.log('Answer created and sent');
-            
+    
         } catch (error) {
             console.error('Error in handleCallOffer:', error);
             if (this.onError) {
@@ -402,11 +393,13 @@ class WebRTCHandler {
     }
 
     sendToSignalingServer(message) {
-        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        if (this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify(message));
             console.log('WebSocket đã kết nối thành công');
-        } else {
+        }
+        else {
             console.error('WebSocket không ở trạng thái mở');
+            // console.log('WebSocket không ở trạng thái mở');
         }
     }
 
