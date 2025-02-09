@@ -12,11 +12,17 @@ class WebSocketHandler:
         self.active_connections[user_code] = websocket
         print(f"User {user_code} connected. Active connections: {list(self.active_connections.keys())}")
 
-    def disconnect(self, user_code: str):
+    async def disconnect(self, user_code: str):
         """Xử lý ngắt kết nối"""
         if user_code in self.active_connections:
-            del self.active_connections[user_code]
-            print(f"User {user_code} disconnected. Total users: {len(self.active_connections)}")
+            # Đóng WebSocket connection nếu vẫn còn mở
+            try:
+                await self.active_connections[user_code].close()
+            except Exception as e:
+                print(f"Error closing websocket for {user_code}: {e}")
+            finally:
+                del self.active_connections[user_code]
+                print(f"User {user_code} disconnected. Total users: {len(self.active_connections)}")
 
     def get_connection(self, user_code: str) -> Optional[WebSocket]:
         """Lấy kết nối WebSocket của một user"""

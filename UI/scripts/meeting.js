@@ -119,10 +119,12 @@ ipcRenderer.on('initial-meeting-data', (event, data) => {
 // Thay thế hàm initializeWebRTC trong meeting.js
 async function initializeWebRTC() {
     try {
-        // Lấy thông tin user từ localStorage
-        userInfo = JSON.parse(localStorage.getItem('currentUser'));
-        if (!userInfo) {
-            throw new Error('Không tìm thấy thông tin người dùng');
+        // Đóng kết nối cũ nếu có
+        if (webrtcHandler) {
+            webrtcHandler.endCall();
+            webrtcHandler = null;
+            // Đợi cleanup
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         // Khởi tạo media stream
@@ -149,31 +151,28 @@ async function initializeWebRTC() {
             }
         }
 
-        // Khởi tạo WebRTC handler
-        // initializeWebRTCHandlers();
-
         // Khởi tạo WebRTC handler với local stream
-        if (userInfo && userInfo.userCode) {
-            webrtcHandler = new WebRTCHandler(userInfo.userCode);
-            
-            // Thiết lập callback cho remote stream
-            webrtcHandler.onRemoteStreamReceived = (stream) => {
-                console.log('Received remote stream');
-                if (remoteVideo) {
-                    remoteVideo.srcObject = stream;
-                }
-            };
-
-            await webrtcHandler.initialize(localStream);
-            console.log('WebRTC handler initialized');
-
-            // Bắt đầu cuộc gọi nếu có targetCode
-            if (targetCode) {
-                webrtcHandler.startCall(targetCode);
-            }
+        userInfo = JSON.parse(localStorage.getItem('currentUser'));
+        if (!userInfo) {
+            throw new Error('Không tìm thấy thông tin người dùng');
         }
 
-        setupVideoFrameCapture();
+        webrtcHandler = new WebRTCHandler(userInfo.userCode);
+        webrtcHandler.onRemoteStreamReceived = (stream) => {
+            console.log('Received remote stream');
+            if (remoteVideo) {
+                remoteVideo.srcObject = stream;
+            }
+        };
+
+        await webrtcHandler.initialize(localStream);
+        console.log('WebRTC handler initialized successfully');
+
+        // Bắt đầu cuộc gọi nếu có targetCode
+        if (targetCode) {
+            console.log('Starting call to:', targetCode);
+            webrtcHandler.startCall(targetCode);
+        }
 
     } catch (error) {
         console.error('Lỗi khởi tạo media:', error);
@@ -396,4 +395,16 @@ window.addEventListener('beforeunload', () => {
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
+});
+
+// cleanup handler cho window
+window.addEventListener('beforeunload', async () => {
+    if (webrtcHandler) {
+        webrtcHandler.endCall();
+    }
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+    }
+    // Đợi cleanup
+    await new Promise(resolve => setTimeout(resolve, 500));
 });

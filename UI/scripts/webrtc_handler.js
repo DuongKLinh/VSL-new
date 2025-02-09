@@ -40,9 +40,19 @@ class WebRTCHandler {
 
     async initialize(localStream) {
         try {
+            // Đảm bảo đóng kết nối cũ
+            if (this.websocket) {
+                if (this.websocket.readyState === WebSocket.OPEN) {
+                    this.websocket.close(1000, "Cleanup before new connection");
+                }
+                this.websocket = null;
+                // Đợi một chút để đảm bảo socket được đóng hoàn toàn
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+    
             this.localStream = localStream;
             await this.connectSignalingServerWithRetry();
-            console.log('WebRTC Handler đã được khởi tạo');
+            console.log('WebRTC Handler đã được khởi tạo thành công');
         } catch (error) {
             console.error('Lỗi khởi tạo WebRTC Handler:', error);
             throw error;
@@ -69,37 +79,46 @@ class WebRTCHandler {
     async connectSignalingServer() {
         return new Promise((resolve, reject) => {
             try {
+                // Đóng kết nối cũ nếu còn tồn tại
+                if (this.websocket) {
+                    this.websocket.close();
+                    this.websocket = null;
+                }
+    
                 const currentIP = window.location.hostname || "localhost";
                 const wsUrl = `ws://${currentIP}:8765/ws/${this.userCode}`;
                 console.log('Đang kết nối tới:', wsUrl);
                 
                 this.websocket = new WebSocket(wsUrl);
                 
+                // Thêm timeout để tránh treo
+                const connectionTimeout = setTimeout(() => {
+                    if (this.websocket.readyState !== WebSocket.OPEN) {
+                        this.websocket.close();
+                        reject(new Error('Kết nối timeout'));
+                    }
+                }, 5000);
+                
                 this.websocket.onopen = () => {
                     console.log('Đã kết nối thành công tới Signaling Server');
+                    clearTimeout(connectionTimeout);
                     this.setupWebSocketHandlers();
                     resolve();
                 };
     
                 this.websocket.onerror = (error) => {
                     console.error('Lỗi WebSocket:', error);
+                    clearTimeout(connectionTimeout);
                     reject(new Error(`Không thể kết nối tới Signaling Server: ${error.message}`));
                 };
     
                 this.websocket.onclose = (event) => {
                     console.log('WebSocket đã đóng:', event.code, event.reason);
+                    clearTimeout(connectionTimeout);
                     if (!event.wasClean) {
                         this.reconnectToSignalingServer();
                     }
                 };
-    
-                // Thêm timeout để tránh đợi quá lâu
-                setTimeout(() => {
-                    if (this.websocket.readyState !== WebSocket.OPEN) {
-                        this.websocket.close();
-                        reject(new Error('Kết nối timeout'));
-                    }
-                }, 5000);
     
             } catch (error) {
                 console.error('Lỗi khi tạo kết nối WebSocket:', error);
@@ -165,8 +184,17 @@ class WebRTCHandler {
     }
     
     async createPeerConnection() {
+        // Đóng kết nối cũ nếu tồn tại
+        if (this.peerConnection) {
+            this.peerConnection.close();
+            this.peerConnection = null;
+            // Đợi một chút để đảm bảo cleanup hoàn toàn
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    
+        console.log('Creating new RTCPeerConnection');
         this.peerConnection = new RTCPeerConnection(this.configuration);
-
+    
         // Thêm local stream
         if (this.localStream) {
             console.log('Adding local stream tracks...');
@@ -177,28 +205,32 @@ class WebRTCHandler {
         } else {
             console.warn('No local stream available');
         }
-
+    
         // Xử lý ICE candidates
         this.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 console.log('New ICE candidate:', event.candidate.type);
-                this.sendToSignalingServer({
-                    type: 'call-candidate',
-                    target: this.targetCode,
-                    candidate: event.candidate
-                });
+                if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                    this.sendToSignalingServer({
+                        type: 'call-candidate',
+                        target: this.targetCode,
+                        candidate: event.candidate
+                    });
+                } else {
+                    console.warn('WebSocket not ready, cannot send ICE candidate');
+                }
             }
         };
-
-        // Thêm xử lý trạng thái ICE
+    
+        // Theo dõi trạng thái ICE
         this.peerConnection.oniceconnectionstatechange = () => {
             console.log('ICE connection state:', this.peerConnection.iceConnectionState);
+            if (this.peerConnection.iceConnectionState === 'failed') {
+                console.log('ICE connection failed - attempting to restart');
+                this.peerConnection.restartIce();
+            }
         };
-
-        this.peerConnection.onicegatheringstatechange = () => {
-            console.log('ICE gathering state:', this.peerConnection.iceGatheringState);
-        };
-
+    
         // Xử lý remote stream
         this.peerConnection.ontrack = (event) => {
             console.log('Received remote track:', event.track.kind);
@@ -209,44 +241,86 @@ class WebRTCHandler {
                 }
             }
         };
-
-        // Xử lý trạng thái kết nối
+    
+        // Theo dõi trạng thái kết nối
         this.peerConnection.onconnectionstatechange = () => {
             console.log('Connection state:', this.peerConnection.connectionState);
             if (this.peerConnection.connectionState === 'failed') {
-                console.log('Connection failed - restarting ICE');
-                this.peerConnection.restartIce();
+                console.log('Connection failed - attempting to reconnect');
+                this.reconnect();
             }
         };
+    }
+
+    async reconnect() {
+        try {
+            console.log('Attempting to reconnect...');
+            
+            // Đóng kết nối cũ
+            if (this.peerConnection) {
+                this.peerConnection.close();
+                this.peerConnection = null;
+            }
+            
+            // Đóng WebSocket cũ
+            if (this.websocket) {
+                if (this.websocket.readyState === WebSocket.OPEN) {
+                    this.websocket.close(1000, "Reconnecting");
+                }
+                this.websocket = null;
+            }
+    
+            // Đợi cleanup
+            await new Promise(resolve => setTimeout(resolve, 1000));
+    
+            // Khởi tạo lại kết nối
+            await this.initialize(this.localStream);
+            
+            // Nếu đang trong cuộc gọi, khởi tạo lại
+            if (this.targetCode) {
+                await this.startCall(this.targetCode);
+            }
+        } catch (error) {
+            console.error('Reconnection failed:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
+        }
     }
 
     async startCall(targetCode) {
         try {
             console.log('Starting call to:', targetCode);
             this.targetCode = targetCode;
-            await this.createPeerConnection();
     
-            // Tạo offer
+            // Tạo peer connection mới nếu chưa có hoặc đã bị đóng
+            if (!this.peerConnection || this.peerConnection.connectionState === 'closed') {
+                await this.createPeerConnection();
+            }
+    
+            console.log('Creating offer...');
             const offer = await this.peerConnection.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true
             });
             
-            // Đặt offer làm local description TRƯỚC KHI gửi
+            console.log('Setting local description...');
             await this.peerConnection.setLocalDescription(offer);
-            console.log('Set local description (offer):', offer.type);
     
-            // Chờ một chút để đảm bảo ICE gathering hoàn tất
+            // Đợi ICE gathering hoàn tất
             await this.waitForIceGathering();
     
-            // Gửi offer với ICE candidates đã được thu thập
-            this.sendToSignalingServer({
-                type: 'call-offer',
-                target: targetCode,
-                offer: this.peerConnection.localDescription
-            });
+            if (this.peerConnection.signalingState === "have-local-offer") {
+                console.log('Sending offer to:', targetCode);
+                this.sendToSignalingServer({
+                    type: 'call-offer',
+                    target: targetCode,
+                    offer: this.peerConnection.localDescription
+                });
+            } else {
+                console.warn('Unexpected signaling state:', this.peerConnection.signalingState);
+            }
     
-            console.log('Offer created and sent');
         } catch (error) {
             console.error('Error in startCall:', error);
             if (this.onError) {
@@ -265,19 +339,32 @@ class WebRTCHandler {
             }
     
             this.targetCode = from;
-            await this.createPeerConnection();
     
-            // Set remote description FIRST
-            const remoteDesc = new RTCSessionDescription(offer);
-            await this.peerConnection.setRemoteDescription(remoteDesc);
-            console.log('Set remote description (offer)');
+            // Tạo peer connection mới nếu cần
+            if (!this.peerConnection || this.peerConnection.connectionState === 'closed') {
+                await this.createPeerConnection();
+            }
     
-            // Then create and set local description
+            // Kiểm tra trạng thái hiện tại
+            console.log('Current signaling state:', this.peerConnection.signalingState);
+            
+            if (this.peerConnection.signalingState !== "stable") {
+                console.log('Rolling back...');
+                await Promise.all([
+                    this.peerConnection.setLocalDescription({type: "rollback"}),
+                    this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+                ]);
+            } else {
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            }
+    
+            console.log('Creating answer...');
             const answer = await this.peerConnection.createAnswer();
+            
+            console.log('Setting local description...');
             await this.peerConnection.setLocalDescription(answer);
-            console.log('Set local description (answer)');
     
-            // Send answer only after both descriptions are set
+            console.log('Sending answer...');
             this.sendToSignalingServer({
                 type: 'call-answer',
                 target: from,
@@ -297,29 +384,19 @@ class WebRTCHandler {
             console.log('Received answer from:', message.from);
             const { answer } = message;
     
-            if (!answer || !answer.type) {
-                console.error('Invalid answer received:', answer);
-                return;
-            }
-    
             if (!this.peerConnection) {
-                console.error('No peer connection available');
-                return;
+                throw new Error('No peer connection available');
             }
     
             const currentState = this.peerConnection.signalingState;
             console.log('Current signaling state:', currentState);
     
-            if (currentState === "stable") {
-                console.warn('Connection already stable, ignoring answer');
-                return;
+            if (currentState === "have-local-offer") {
+                console.log('Setting remote description from answer');
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            } else {
+                console.warn('Unexpected signaling state for answer:', currentState);
             }
-    
-            const remoteDesc = new RTCSessionDescription(answer);
-            await this.peerConnection.setRemoteDescription(remoteDesc);
-            console.log('Set remote description (answer)');
-            
-            await this.processPendingIceCandidates();
     
         } catch (error) {
             console.error('Error in handleCallAnswer:', error);
@@ -327,6 +404,14 @@ class WebRTCHandler {
                 this.onError(error);
             }
         }
+    }
+
+    isConnectionActive() {
+        return this.peerConnection && 
+               this.peerConnection.connectionState !== 'closed' &&
+               this.peerConnection.connectionState !== 'failed' &&
+               this.websocket &&
+               this.websocket.readyState === WebSocket.OPEN;
     }
 
     // Hàm đợi ICE gathering hoàn tất
@@ -393,13 +478,20 @@ class WebRTCHandler {
     }
 
     sendToSignalingServer(message) {
-        if (this.websocket.readyState === WebSocket.OPEN) {
-            this.websocket.send(JSON.stringify(message));
-            console.log('WebSocket đã kết nối thành công');
-        }
-        else {
+        if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
             console.error('WebSocket không ở trạng thái mở');
-            // console.log('WebSocket không ở trạng thái mở');
+            if (this.onError) {
+                this.onError(new Error('Mất kết nối WebSocket'));
+            }
+            return;
+        }
+        try {
+            this.websocket.send(JSON.stringify(message));
+        } catch (error) {
+            console.error('Lỗi gửi message:', error);
+            if (this.onError) {
+                this.onError(error);
+            }
         }
     }
 
@@ -419,13 +511,16 @@ class WebRTCHandler {
                 this.peerConnection = null;
             }
     
-            // Đóng WebSocket
-            if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-                this.websocket.close();
+            // Đóng WebSocket và đảm bảo cleanup
+            if (this.websocket) {
+                if (this.websocket.readyState === WebSocket.OPEN) {
+                    this.websocket.close(1000, "Kết thúc cuộc gọi");
+                }
                 this.websocket = null;
             }
     
             this.targetCode = null;
+            this.retryCount = 0;
         } catch (error) {
             console.error('Lỗi khi kết thúc cuộc gọi:', error);
         }
