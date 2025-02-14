@@ -249,28 +249,28 @@ function setupVideoFrameCapture() {
 
 // Gửi frames đến server để xử lý
 async function sendFramesToServer(frames) {
-    // try {
-    //     console.log('Gửi frames...');
-    //     const response = await fetch('http://192.168.1.8:8000/api/process-frames', {
-    //         method: 'POST',
-    //         headers: {
-    //             'Content-Type': 'application/json',
-    //         },
-    //         body: JSON.stringify({ frames: frames })
-    //     });
+    try {
+        console.log('Gửi frames...');
+        const response = await fetch('http://192.168.1.12:8000/api/process-frames', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ frames: frames })
+        });
 
-    //     if (!response.ok) {
-    //         throw new Error(`HTTP error! status: ${response.status}`);
-    //     }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-    //     const data = await response.json();
-    //     console.log('Kết quả từ server:', data);
+        const data = await response.json();
+        console.log('Kết quả từ server:', data);
         
-    //     // Cập nhật nhãn dựa trên kết quả từ server
-    //     updatePredictionLabel(data);
-    // } catch (error) {
-    //     console.error('Lỗi gửi frames:', error);
-    // }
+        // Cập nhật nhãn dựa trên kết quả từ server
+        updatePredictionLabel(data);
+    } catch (error) {
+        console.error('Lỗi gửi frames:', error);
+    }
     return;
 }
 
