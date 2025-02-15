@@ -14,6 +14,8 @@ import base64
 from datetime import datetime
 import os
 import json
+from services.speech_service import SpeechToTextService
+import asyncio
 
 # Khởi tạo ứng dụng FastAPI
 app = FastAPI()
@@ -26,6 +28,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Khởi tạo service
+stt_service = SpeechToTextService()
 
 # Định nghĩa model request
 class VideoFramesRequest(BaseModel):
@@ -125,6 +130,31 @@ async def process_frames(request: VideoFramesRequest):
     except Exception as e:
         print(f"Lỗi xử lý frames: {str(e)}")
         raise HTTPException(status_code=400, detail=f"{str(e)}")
+
+# Thêm endpoint mới
+@app.post("/api/start-speech-recognition")
+async def start_speech_recognition():
+    try:
+        stt_service.start_listening()
+        return {"status": "success", "message": "Speech recognition started"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/stop-speech-recognition")
+async def stop_speech_recognition():
+    try:
+        stt_service.stop_listening()
+        return {"status": "success", "message": "Speech recognition stopped"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-speech-text")
+async def get_speech_text():
+    try:
+        text = stt_service.get_recognized_text()
+        return {"status": "success", "text": text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,5 +1,7 @@
 // meeting.js
 
+const BASE_API_URL = 'http://192.168.1.22:8000';
+
 const handleMediaError = (error) => {
     let message = 'Lỗi truy cập thiết bị media: ';
     if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
@@ -67,6 +69,9 @@ let targetCode = null;
 // Lấy thông tin user từ localStorage
 let userInfo = null;
 
+let recognitionInterval = null;
+let isRecognizing = false;
+
 // Thêm listener để bắt sự kiện phím
 document.addEventListener('keydown', (event) => {
     // Chỉ xử lý khi translation được bật
@@ -107,9 +112,17 @@ ipcRenderer.on('initial-meeting-data', (event, data) => {
     initialMicState = data.micEnabled;
     initialCameraState = data.cameraEnabled;
     targetCode = data.targetCode;
+    
+    // Đồng bộ trạng thái recognition với mic
+    isRecognizing = initialMicState;
+    
+    // Nếu mic được bật ban đầu, bắt đầu speech recognition
+    if (initialMicState) {
+        startSpeechRecognition();
+    }
+    
     initializeWebRTC();
     
-    // Bắt đầu cuộc gọi sau khi đã khởi tạo
     if (webrtcHandler && targetCode) {
         webrtcHandler.startCall(targetCode);
     }
@@ -206,6 +219,58 @@ function initializeWebRTCHandlers() {
     });
 }
 
+// Thêm hàm mới để xử lý việc bắt đầu speech recognition
+async function startSpeechRecognition() {
+    try {
+        const response = await fetch(`${BASE_API_URL}/api/start-speech-recognition`, {
+            method: 'POST'
+        }).catch(error => {
+            console.error('Error starting speech recognition:', error);
+            return null;
+        });
+        
+        if (response && response.ok) {
+            isRecognizing = true;
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+            }
+            recognitionInterval = setInterval(async () => {
+                if (isRecognizing) {
+                    try {
+                        const textResponse = await fetch(`${BASE_API_URL}/api/get-speech-text`);
+                        const data = await textResponse.json();
+                        if (data.text) {
+                            updateSpeechText(data.text);
+                        }
+                    } catch (error) {
+                        console.error('Error getting speech text:', error);
+                    }
+                }
+            }, 500);
+        }
+    } catch (error) {
+        console.error('Error in speech recognition:', error);
+    }
+}
+
+// Thêm hàm mới để dừng speech recognition
+async function stopSpeechRecognition() {
+    try {
+        isRecognizing = false;
+        if (recognitionInterval) {
+            clearInterval(recognitionInterval);
+            recognitionInterval = null;
+        }
+        await fetch(`${BASE_API_URL}/api/stop-speech-recognition`, {
+            method: 'POST'
+        }).catch(error => {
+            console.error('Error stopping speech recognition:', error);
+        });
+    } catch (error) {
+        console.error('Error stopping speech recognition:', error);
+    }
+}
+
 // Thiết lập capture video frames để nhận dạng
 function setupVideoFrameCapture() {
     console.log('Setting up video capture...');
@@ -251,7 +316,7 @@ function setupVideoFrameCapture() {
 async function sendFramesToServer(frames) {
     try {
         console.log('Gửi frames...');
-        const response = await fetch('http://192.168.1.12:8000/api/process-frames', {
+        const response = await fetch(`${BASE_API_URL}/api/process-frames`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -312,16 +377,36 @@ function updateTranslationOverlay(label) {
 }
 
 // Xử lý các nút điều khiển
-micButton.addEventListener('click', () => {
+micButton.addEventListener('click', async () => {
     if (localStream) {
         const audioTrack = localStream.getAudioTracks()[0];
         if (audioTrack) {
             isMicOn = !isMicOn;
             audioTrack.enabled = isMicOn;
             micButton.querySelector('img').src = isMicOn ? '../assets/mic-on.png' : '../assets/mic-off.png';
+
+            // Đồng bộ trạng thái speech recognition với mic
+            if (isMicOn) {
+                await startSpeechRecognition();
+            } else {
+                await stopSpeechRecognition();
+            }
         }
     }
 });
+
+// Thêm hàm cập nhật text
+function updateSpeechText(text) {
+    // Kiểm tra xem đã có element hiển thị text chưa
+    let textDisplay = document.querySelector('.speech-text');
+    if (!textDisplay) {
+        // Tạo mới nếu chưa có
+        textDisplay = document.createElement('div');
+        textDisplay.className = 'speech-text';
+        document.querySelector('#self').appendChild(textDisplay);
+    }
+    textDisplay.textContent = text;
+}
 
 cameraButton.addEventListener('click', () => {
     if (localStream) {
@@ -388,23 +473,24 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Xử lý khi đóng cửa sổ
-window.addEventListener('beforeunload', () => {
-    if (webrtcHandler) {
-        webrtcHandler.endCall();
-    }
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-    }
-});
-
-// cleanup handler cho window
 window.addEventListener('beforeunload', async () => {
-    if (webrtcHandler) {
-        webrtcHandler.endCall();
+    try {
+        // Cleanup WebRTC
+        if (webrtcHandler) {
+            webrtcHandler.endCall();
+        }
+
+        // Cleanup media streams
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+
+        // Cleanup speech recognition
+        await stopSpeechRecognition();
+
+        // Đợi cleanup hoàn tất
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+        console.error('Error during cleanup:', error);
     }
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-    }
-    // Đợi cleanup
-    await new Promise(resolve => setTimeout(resolve, 500));
 });
