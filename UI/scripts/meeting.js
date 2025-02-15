@@ -181,6 +181,19 @@ async function initializeWebRTC() {
         await webrtcHandler.initialize(localStream);
         console.log('WebRTC handler initialized successfully');
 
+        webrtcHandler.onTextReceived = (text) => {
+            // Chỉ hiển thị text khi nhận được từ người khác
+            if (!isMicOn) {
+                let textDisplay = document.querySelector('.speech-text');
+                if (!textDisplay) {
+                    textDisplay = document.createElement('div');
+                    textDisplay.className = 'speech-text';
+                    document.querySelector('#self').appendChild(textDisplay);
+                }
+                textDisplay.textContent = text;
+            }
+        };
+
         // Bắt đầu cuộc gọi nếu có targetCode
         if (targetCode) {
             console.log('Starting call to:', targetCode);
@@ -397,15 +410,18 @@ micButton.addEventListener('click', async () => {
 
 // Thêm hàm cập nhật text
 function updateSpeechText(text) {
-    // Kiểm tra xem đã có element hiển thị text chưa
     let textDisplay = document.querySelector('.speech-text');
     if (!textDisplay) {
-        // Tạo mới nếu chưa có
         textDisplay = document.createElement('div');
         textDisplay.className = 'speech-text';
         document.querySelector('#self').appendChild(textDisplay);
     }
     textDisplay.textContent = text;
+    
+    // Gửi text qua WebRTC nếu đang là người nói
+    if (webrtcHandler && isMicOn) {
+        webrtcHandler.sendText(text);
+    }
 }
 
 cameraButton.addEventListener('click', () => {

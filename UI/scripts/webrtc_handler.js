@@ -35,7 +35,10 @@ class WebRTCHandler {
         this.onRemoteStreamReceived = null;
         this.onCallReceived = null;
         this.onCallRejected = null;
-        this.onError = null;  
+        this.onError = null;
+
+        this.dataChannel = null;
+        this.onTextReceived = null;
     }
 
     async initialize(localStream) {
@@ -194,7 +197,17 @@ class WebRTCHandler {
     
         console.log('Creating new RTCPeerConnection');
         this.peerConnection = new RTCPeerConnection(this.configuration);
-    
+        
+        if (this.peerConnection) {
+            this.dataChannel = this.peerConnection.createDataChannel("textChannel");
+            this.setupDataChannel(this.dataChannel);
+            
+            this.peerConnection.ondatachannel = (event) => {
+                this.dataChannel = event.channel;
+                this.setupDataChannel(this.dataChannel);
+            };
+        }
+
         // Thêm local stream
         if (this.localStream) {
             console.log('Adding local stream tracks...');
@@ -250,6 +263,21 @@ class WebRTCHandler {
                 this.reconnect();
             }
         };
+    }
+
+    setupDataChannel(channel) {
+        channel.onmessage = (event) => {
+            if (this.onTextReceived) {
+                this.onTextReceived(event.data);
+            }
+        };
+    }
+    
+    // method gửi text
+    sendText(text) {
+        if (this.dataChannel && this.dataChannel.readyState === "open") {
+            this.dataChannel.send(text);
+        }
     }
 
     async reconnect() {
