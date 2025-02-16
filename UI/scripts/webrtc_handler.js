@@ -89,7 +89,9 @@ class WebRTCHandler {
                 }
     
                 const currentIP = window.location.hostname || "localhost";
-                const wsUrl = `ws://${currentIP}:8765/ws/${this.userCode}`;
+                // const wsUrl = `ws://${currentIP}:8765/ws/${this.userCode}`;
+                const wsUrl = `wss://db0b-1-53-63-184.ngrok-free.app/ws/${this.userCode}`;
+
                 console.log('Đang kết nối tới:', wsUrl);
                 
                 this.websocket = new WebSocket(wsUrl);
@@ -419,7 +421,7 @@ class WebRTCHandler {
             const currentState = this.peerConnection.signalingState;
             console.log('Current signaling state:', currentState);
     
-            if (currentState === "have-local-offer") {
+            if (currentState === "have-remote-offer") {
                 console.log('Setting remote description from answer');
                 await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
             } else {
