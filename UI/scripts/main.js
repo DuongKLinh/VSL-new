@@ -41,50 +41,58 @@ ipcRenderer.on('user-code', (event, userCode) => {
 async function initializeWebRTC(userCode) {
     try {
         console.log('Bắt đầu khởi tạo WebRTC với userCode:', userCode);
-        if (!webrtcHandler) {
-            webrtcHandler = new WebRTCHandler(userCode);
-            console.log('WebRTC handler được tạo mới');
-            
-            webrtcHandler.onCallReceived = (message) => {
-                console.log('Nhận được cuộc gọi từ:', message.from);
-                const targetCode = message.from;
-                showIncomingCallPopup(targetCode);
-            };
-
-            webrtcHandler.onCallRejected = () => {
-                console.log('Cuộc gọi bị từ chối');
-                ipcRenderer.send('show-notification', {
-                    title: 'Cuộc gọi bị từ chối',
-                    message: 'Người dùng đã từ chối cuộc gọi'
-                });
-            };
-
-            webrtcHandler.onError = (error) => {
-                console.error('Lỗi WebRTC:', error);
-                ipcRenderer.send('show-notification', {
-                    title: 'Lỗi kết nối',
-                    message: 'Không thể thiết lập kết nối. Vui lòng thử lại sau.'
-                });
-            };
-
-            await webrtcHandler.initialize();
-            console.log('WebRTC handler đã khởi tạo xong');
-        } else {
-            console.log('WebRTC handler đã tồn tại');
+        
+        // === ✅ Ensure that the old WebRTC connection is closed before reinitializing ===
+        if (webrtcHandler) {
+            console.log('Đóng kết nối WebRTC cũ trước khi khởi tạo mới.');
+            webrtcHandler.endCall();  // Closes peer connection, streams, and WebSocket
+            webrtcHandler = null;
         }
+
+        // === ✅ Create a new WebRTC Handler ===
+        webrtcHandler = new WebRTCHandler(userCode);
+        console.log('WebRTC handler được tạo mới');
+
+        // Event handlers for WebRTC
+        webrtcHandler.onCallReceived = (message) => {
+            console.log('Nhận được cuộc gọi từ:', message.from);
+            const targetCode = message.from;
+            showIncomingCallPopup(targetCode);
+        };
+
+        webrtcHandler.onCallRejected = () => {
+            console.log('Cuộc gọi bị từ chối');
+            ipcRenderer.send('show-notification', {
+                title: 'Cuộc gọi bị từ chối',
+                message: 'Người dùng đã từ chối cuộc gọi'
+            });
+        };
+
+        webrtcHandler.onError = (error) => {
+            console.error('Lỗi WebRTC:', error);
+            ipcRenderer.send('show-notification', {
+                title: 'Lỗi kết nối',
+                message: 'Không thể thiết lập kết nối. Vui lòng thử lại sau.'
+            });
+        };
+
+        await webrtcHandler.initialize();
+        console.log('WebRTC handler đã khởi tạo xong');
+
     } catch (error) {
         console.error('Lỗi khởi tạo WebRTC:', error);
         ipcRenderer.send('show-notification', {
             title: 'Lỗi khởi tạo',
             message: 'Không thể khởi tạo kết nối. Vui lòng kiểm tra kết nối mạng.'
         });
-        
+
         // Thử lại sau 5 giây
         setTimeout(() => {
             initializeWebRTC(userCode);
         }, 5000);
     }
 }
+
 
 // Copy code
 copyButton.addEventListener('click', () => {

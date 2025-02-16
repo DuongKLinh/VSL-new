@@ -370,23 +370,31 @@ class WebRTCHandler {
     
             this.targetCode = from;
     
-            // Tạo peer connection mới nếu cần
             if (!this.peerConnection || this.peerConnection.connectionState === 'closed') {
                 await this.createPeerConnection();
             }
     
-            // Kiểm tra trạng thái hiện tại
             console.log('Current signaling state:', this.peerConnection.signalingState);
             
+            // if (this.peerConnection.signalingState !== "stable") {
+            //     console.log('Rolling back...');
+            //     await Promise.all([
+            //         this.peerConnection.setLocalDescription({type: "rollback"}),
+            //         this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+            //     ]);
+            // } else {
+            //     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            // }
             if (this.peerConnection.signalingState !== "stable") {
-                console.log('Rolling back...');
-                await Promise.all([
-                    this.peerConnection.setLocalDescription({type: "rollback"}),
-                    this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-                ]);
-            } else {
-                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                console.log('Rolling back before setting new remote description...');
+                try {
+                    await this.peerConnection.setLocalDescription({ type: "rollback" });
+                } catch (rollbackError) {
+                    console.warn('Rollback failed:', rollbackError);
+                }
             }
+            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            await this.processPendingIceCandidates();
     
             console.log('Creating answer...');
             const answer = await this.peerConnection.createAnswer();
@@ -403,11 +411,9 @@ class WebRTCHandler {
     
         } catch (error) {
             console.error('Error in handleCallOffer:', error);
-            if (this.onError) {
-                this.onError(error);
-            }
         }
     }
+    
 
     async handleCallAnswer(message) {
         try {
@@ -418,23 +424,29 @@ class WebRTCHandler {
                 throw new Error('No peer connection available');
             }
     
+            let attempt = 0;
+            while (this.peerConnection.signalingState !== "have-local-offer" && attempt < 5) {
+                console.log("Waiting for signaling state to be 'have-local-offer'...");
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempt++;
+            }
+    
             const currentState = this.peerConnection.signalingState;
             console.log('Current signaling state:', currentState);
     
-            if (currentState === "have-remote-offer") {
-                console.log('Setting remote description from answer');
+            if (currentState === "have-local-offer") {
+                console.log('Setting remote description with answer...');
                 await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log('Remote description set successfully.');
             } else {
                 console.warn('Unexpected signaling state for answer:', currentState);
             }
     
         } catch (error) {
             console.error('Error in handleCallAnswer:', error);
-            if (this.onError) {
-                this.onError(error);
-            }
         }
     }
+    
 
     isConnectionActive() {
         return this.peerConnection && 
@@ -469,7 +481,6 @@ class WebRTCHandler {
         try {
             const { candidate } = message;
             if (this.peerConnection && candidate) {
-                // Đợi cho đến khi remote description được set
                 if (this.peerConnection.remoteDescription === null) {
                     console.log('Buffering ICE candidate vì remote description chưa sẵn sàng');
                     if (!this.iceCandidatesBuffer) {
@@ -481,15 +492,12 @@ class WebRTCHandler {
     
                 console.log('Adding received ICE candidate');
                 await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log('Successfully added ICE candidate');
             }
         } catch (error) {
             console.error('Error adding received ICE candidate:', error);
-            if (this.onError) {
-                this.onError(error);
-            }
         }
     }
+    
     
     // Hàm xử lý các candidate đã được buffer
     async processPendingIceCandidates() {
