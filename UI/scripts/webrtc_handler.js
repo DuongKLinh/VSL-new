@@ -39,6 +39,7 @@ class WebRTCHandler {
 
         this.dataChannel = null;
         this.onTextReceived = null;
+        this.onTranslationResult = null;
     }
 
     async initialize(localStream) {
@@ -90,7 +91,7 @@ class WebRTCHandler {
     
                 const currentIP = window.location.hostname || "localhost";
                 // const wsUrl = `ws://${currentIP}:8765/ws/${this.userCode}`;
-                const wsUrl = `wss://db0b-1-53-63-184.ngrok-free.app/ws/${this.userCode}`;
+                const wsUrl = `wss://0121-2001-ee0-4161-5c1f-2cc3-e3e5-8b38-1b73.ngrok-free.app/ws/${this.userCode}`;
 
                 console.log('Đang kết nối tới:', wsUrl);
                 
@@ -267,10 +268,34 @@ class WebRTCHandler {
         };
     }
 
+    sendTranslationResult(label) {
+        if (this.dataChannel && this.dataChannel.readyState === "open") {
+            this.dataChannel.send(JSON.stringify({
+                type: 'translation',
+                label: label
+            }));
+        }
+    }
+
     setupDataChannel(channel) {
         channel.onmessage = (event) => {
-            if (this.onTextReceived) {
-                this.onTextReceived(event.data);
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'translation') {
+                    if (this.onTranslationResult) {
+                        this.onTranslationResult(data.label);
+                    }
+                } else {
+                    // Xử lý tin nhắn text thông thường
+                    if (this.onTextReceived) {
+                        this.onTextReceived(event.data);
+                    }
+                }
+            } catch (e) {
+                // Nếu không phải JSON, xử lý như text thông thường
+                if (this.onTextReceived) {
+                    this.onTextReceived(event.data);
+                }
             }
         };
     }

@@ -178,6 +178,10 @@ async function initializeWebRTC() {
             }
         };
 
+        webrtcHandler.onTranslationResult = (label) => {
+            displayRemoteTranslation(label);
+        };
+        
         await webrtcHandler.initialize(localStream);
         console.log('WebRTC handler initialized successfully');
 
@@ -360,13 +364,16 @@ function updatePredictionLabel(data) {
     
     if (data.status === 'success' && data.label) {
         labelText = `Đang nói: ${data.label}`;
+        // Gửi kết quả dịch qua WebRTC
+        if (webrtcHandler) {
+            webrtcHandler.sendTranslationResult(data.label);
+        }
     } else if (data.status === 'no_hand_detected') {
         labelText = 'Không phát hiện bàn tay';
     } else if (data.status === 'insufficient_data') {
         labelText = 'Chưa đủ dữ liệu';
     }
 
-    // Thêm độ trễ ngẫu nhiên để tự nhiên hơn
     setTimeout(() => {
         selfPredictionLabel.textContent = labelText;
         selfPredictionLabel.classList.add('updated');
@@ -374,7 +381,18 @@ function updatePredictionLabel(data) {
         setTimeout(() => {
             selfPredictionLabel.classList.remove('updated');
         }, 300);
-    }, Math.random() * 500); // Độ trễ ngẫu nhiên từ 0-500ms
+    }, Math.random() * 500);
+}
+
+function displayRemoteTranslation(label) {
+    // Tìm hoặc tạo element để hiển thị kết quả dịch của người khác
+    let remoteTranslation = document.querySelector('.remote-translation');
+    if (!remoteTranslation) {
+        remoteTranslation = document.createElement('div');
+        remoteTranslation.className = 'prediction-label remote-translation';
+        remoteParticipant.appendChild(remoteTranslation);
+    }
+    remoteTranslation.textContent = `Đang nói: ${label}`;
 }
 
 // Cập nhật kết quả dịch
