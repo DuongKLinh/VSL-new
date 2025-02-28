@@ -44,6 +44,12 @@ remoteUserName.classList.add('remote-username');
 
 remoteParticipant.appendChild(remoteVideo);
 remoteParticipant.appendChild(remoteUserName);
+// Thêm khu vực hiển thị tin nhắn cho người dùng khác
+const remoteMessageElement = document.createElement('div');
+remoteMessageElement.id = 'remote-message';
+remoteMessageElement.className = 'message-display remote-message';
+remoteMessageElement.style.display = 'none'; // Ẩn ban đầu
+remoteParticipant.appendChild(remoteMessageElement);
 participantsContainer.appendChild(remoteParticipant);
 
 let localStream = null;
@@ -186,13 +192,34 @@ async function initializeWebRTC() {
         console.log('WebRTC handler initialized successfully');
 
         webrtcHandler.onTextReceived = (text) => {
-            // Chỉ hiển thị text khi nhận được từ người khác
-            if (!isMicOn) {
-                let textDisplay = document.querySelector('.speech-text');
+            try {
+                // Cố gắng phân tích chuỗi JSON
+                const data = JSON.parse(text);
+                
+                // Xử lý các loại tin nhắn khác nhau
+                if (data.type === 'chat-message') {
+                    // Hiển thị tin nhắn chat từ người khác vào phần remote-message
+                    console.log('Received chat message:', data.content);
+                    displayRemoteMessage(data.content);
+                } else if (data.type === 'translation') {
+                    // Xử lý kết quả dịch
+                    if (data.label) {
+                        displayRemoteTranslation(data.label);
+                    }
+                } else {
+                    // Xử lý các loại tin nhắn khác (nếu có)
+                    console.log('Received message:', data);
+                }
+            } catch (e) {
+                // Nếu không phải JSON, hiển thị như tin nhắn thông thường
+                console.log('Received non-JSON text:', text);
+                
+                // Xử lý văn bản nhận dạng giọng nói
+                let textDisplay = document.querySelector('.remote-speech-text');
                 if (!textDisplay) {
                     textDisplay = document.createElement('div');
-                    textDisplay.className = 'speech-text';
-                    document.querySelector('#self').appendChild(textDisplay);
+                    textDisplay.className = 'speech-text remote-speech-text';
+                    remoteParticipant.appendChild(textDisplay);
                 }
                 textDisplay.textContent = text;
             }
@@ -428,10 +455,11 @@ micButton.addEventListener('click', async () => {
 
 // Thêm hàm cập nhật text
 function updateSpeechText(text) {
-    let textDisplay = document.querySelector('.speech-text');
+    // Hiển thị tin nhắn ở phía người dùng hiện tại
+    let textDisplay = document.querySelector('.self-speech-text');
     if (!textDisplay) {
         textDisplay = document.createElement('div');
-        textDisplay.className = 'speech-text';
+        textDisplay.className = 'speech-text self-speech-text';
         document.querySelector('#self').appendChild(textDisplay);
     }
     textDisplay.textContent = text;
@@ -528,3 +556,73 @@ window.addEventListener('beforeunload', async () => {
         console.error('Error during cleanup:', error);
     }
 });
+
+// Thêm biến và tham chiếu cho phần chat
+const chatInput = document.getElementById('chat-input');
+const sendButton = document.getElementById('send-message');
+const selfMessageDisplay = document.getElementById('self-message');
+const remoteMessageDisplay = document.getElementById('remote-message');
+
+// Thêm hàm gửi tin nhắn
+function sendChatMessage() {
+    const message = chatInput.value.trim();
+    if (message && webrtcHandler) {
+        // Hiển thị tin nhắn của mình
+        displaySelfMessage(message);
+        
+        // Gửi tin nhắn qua WebRTC
+        webrtcHandler.sendText(JSON.stringify({
+            type: 'chat-message',
+            content: message
+        }));
+        
+        // Xóa nội dung input sau khi gửi
+        chatInput.value = '';
+    }
+}
+
+// Hàm hiển thị tin nhắn của mình
+function displaySelfMessage(message) {
+    selfMessageDisplay.textContent = message;
+    selfMessageDisplay.style.display = 'block';
+    
+    // Tự động ẩn sau 10 giây
+    setTimeout(() => {
+        selfMessageDisplay.style.display = 'none';
+    }, 10000);
+}
+
+// Hàm hiển thị tin nhắn từ người khác
+function displayRemoteMessage(message) {
+    // Tìm hoặc tạo element để hiển thị tin nhắn của người dùng khác
+    let messageDisplay = document.querySelector('.remote-message');
+    if (!messageDisplay) {
+        // Nếu không tìm thấy, tạo mới
+        const remoteMessageElement = document.createElement('div');
+        remoteMessageElement.id = 'remote-message';
+        remoteMessageElement.className = 'message-display remote-message';
+        remoteParticipant.appendChild(remoteMessageElement);
+    }
+    
+    messageDisplay.textContent = message;
+    messageDisplay.style.display = 'block';
+    
+    // Tự động ẩn sau 10 giây
+    setTimeout(() => {
+        messageDisplay.style.display = 'none';
+    }, 10000);
+}
+
+// Thêm sự kiện click cho nút gửi
+if (sendButton) {
+    sendButton.addEventListener('click', sendChatMessage);
+}
+
+// Thêm sự kiện nhấn Enter trong input
+if (chatInput) {
+    chatInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+}

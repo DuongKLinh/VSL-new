@@ -91,7 +91,7 @@ class WebRTCHandler {
     
                 const currentIP = window.location.hostname || "localhost";
                 // const wsUrl = `ws://${currentIP}:8765/ws/${this.userCode}`;
-                const wsUrl = `wss://0121-2001-ee0-4161-5c1f-2cc3-e3e5-8b38-1b73.ngrok-free.app/ws/${this.userCode}`;
+                const wsUrl = `wss://2945-2001-ee0-4161-5c1f-1d77-d186-a99b-5938.ngrok-free.app/ws/${this.userCode}`;
 
                 console.log('Đang kết nối tới:', wsUrl);
                 

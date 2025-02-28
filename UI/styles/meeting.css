@@ -282,3 +282,51 @@ body {
     border-radius: 5px;
     font-size: 16px;
 }
+
+/* Khu vực chat */
+.chat-area {
+    display: flex;
+    width: 100%;
+    margin-top: 10px;
+    padding: 0 5px;
+}
+
+.chat-input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 5px;
+    font-size: 14px;
+}
+
+.send-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.send-button:hover {
+    background-color: #45a049;
+}
+
+.message-display {
+    margin-top: 5px;
+    padding: 8px;
+    background-color: #f1f1f1;
+    border-radius: 4px;
+    font-size: 14px;
+    max-width: 100%;
+    word-wrap: break-word;
+    min-height: 20px;
+    display: none; /* Ẩn ban đầu, chỉ hiển thị khi có tin nhắn */
+}
+
+.remote-message {
+    background-color: #e2f0ff;
+}
+
